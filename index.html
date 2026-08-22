@@ -5,12 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kantasu-Roms</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --bg-primary: #0d0d0d;
             --bg-secondary: #1a1a1a;
@@ -24,12 +19,7 @@
             --border: #2a2a2a;
             --border-selected: #ffffff;
         }
-
-        html, body {
-            height: 100%;
-            overflow: hidden;
-        }
-
+        html, body { height: 100%; overflow: hidden; }
         body {
             background: var(--bg-primary);
             font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
@@ -40,438 +30,121 @@
             flex-direction: column;
             position: relative;
         }
-
-        /* ===== ANIMATED PURPLE BACKGROUND ===== */
-        .bg-animation {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            overflow: hidden;
-            pointer-events: none;
-        }
-
+        .bg-animation { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
         .bg-blob {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.15;
-            animation: float 20s infinite ease-in-out;
+            position: absolute; border-radius: 50%; filter: blur(80px);
+            opacity: 0.12; animation: float 20s infinite ease-in-out;
         }
-
-        .bg-blob:nth-child(1) {
-            width: 600px; height: 600px;
-            background: #8a2be2;
-            top: -200px; left: -100px;
-            animation-delay: 0s;
-        }
-        .bg-blob:nth-child(2) {
-            width: 500px; height: 500px;
-            background: #9370db;
-            bottom: -150px; right: -100px;
-            animation-delay: -5s;
-            animation-duration: 25s;
-        }
-        .bg-blob:nth-child(3) {
-            width: 400px; height: 400px;
-            background: #6a0dad;
-            top: 40%; left: 50%;
-            animation-delay: -10s;
-            animation-duration: 30s;
-        }
-        .bg-blob:nth-child(4) {
-            width: 350px; height: 350px;
-            background: #ba55d3;
-            top: 20%; right: 20%;
-            animation-delay: -15s;
-            animation-duration: 22s;
-        }
-
+        .bg-blob:nth-child(1) { width: 600px; height: 600px; background: #8a2be2; top: -200px; left: -100px; }
+        .bg-blob:nth-child(2) { width: 500px; height: 500px; background: #9370db; bottom: -150px; right: -100px; animation-delay: -5s; animation-duration: 25s; }
+        .bg-blob:nth-child(3) { width: 400px; height: 400px; background: #6a0dad; top: 40%; left: 50%; animation-delay: -10s; animation-duration: 30s; }
+        .bg-blob:nth-child(4) { width: 350px; height: 350px; background: #ba55d3; top: 20%; right: 20%; animation-delay: -15s; animation-duration: 22s; }
         @keyframes float {
             0%, 100% { transform: translate(0, 0) scale(1); }
             25% { transform: translate(50px, -80px) scale(1.1); }
             50% { transform: translate(-40px, 60px) scale(0.95); }
             75% { transform: translate(80px, 30px) scale(1.05); }
         }
-
-        /* ===== HEADER ===== */
         .header {
-            background: rgba(26, 26, 26, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-            padding: 0 32px;
-            height: 56px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0;
-            z-index: 100;
-            position: relative;
+            background: rgba(26, 26, 26, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border); padding: 0 32px; height: 56px;
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; position: relative;
         }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 32px;
-        }
-
-        .logo {
-            font-size: 1.3rem;
-            font-weight: 900;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            color: var(--text-primary);
-        }
-
-        .logo span {
-            color: var(--accent);
-        }
-
-        .nav {
-            display: flex;
-            gap: 28px;
-        }
-
+        .header-left { display: flex; align-items: center; gap: 32px; }
+        .logo { font-size: 1.3rem; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; color: var(--text-primary); }
+        .logo span { color: var(--accent); }
+        .nav { display: flex; gap: 28px; }
         .nav-item {
-            font-size: 0.82rem;
-            font-weight: 600;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-            cursor: pointer;
-            padding: 4px 0;
-            border-bottom: 2px solid transparent;
-            transition: color 0.2s, border-color 0.2s;
-            user-select: none;
+            font-size: 0.82rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
+            color: var(--text-secondary); cursor: pointer; padding: 4px 0;
+            border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; user-select: none;
         }
-
-        .nav-item:hover,
-        .nav-item.active {
-            color: var(--accent);
-            border-bottom-color: var(--accent);
-        }
-
-        .nav-item:focus {
-            outline: none;
-            color: var(--accent);
-        }
-
-        /* ===== MAIN CONTENT ===== */
-        .main {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 24px 32px;
-            position: relative;
-            z-index: 1;
-        }
-
+        .nav-item:hover, .nav-item.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .nav-item:focus { outline: none; color: var(--accent); }
+        .main { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 32px; position: relative; z-index: 1; }
         .main::-webkit-scrollbar { width: 8px; }
         .main::-webkit-scrollbar-track { background: rgba(26,26,26,0.5); }
         .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         .main::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-        /* ===== GAME GRID ===== */
-        .games-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 20px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
+        .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
         .game-card {
-            position: relative;
-            aspect-ratio: 1 / 1;
-            background: var(--bg-card);
-            border-radius: 8px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-            outline: none;
-            border: 3px solid transparent;
+            position: relative; aspect-ratio: 1 / 1; background: var(--bg-card); border-radius: 8px;
+            overflow: hidden; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;
+            outline: none; border: 3px solid transparent;
         }
-
-        .game-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        .game-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
+        .game-card.selected, .game-card:focus-visible {
+            border-color: var(--border-selected); box-shadow: 0 0 0 2px var(--bg-primary), 0 0 20px var(--accent-glow);
         }
-
-        .game-card.selected,
-        .game-card:focus-visible {
-            border-color: var(--border-selected);
-            box-shadow: 0 0 0 2px var(--bg-primary), 0 0 20px var(--accent-glow);
-        }
-
-        .game-card.selected {
-            transform: scale(1.03);
-        }
-
-        .game-cover {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .game-cover img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
+        .game-card.selected { transform: scale(1.03); }
+        .game-cover { position: absolute; inset: 0; width: 100%; height: 100%; }
+        .game-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .game-overlay {
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 60%);
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 12px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
+            position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 60%);
+            display: flex; flex-direction: column; justify-content: flex-end; padding: 12px; opacity: 0; transition: opacity 0.2s ease;
         }
-
-        .game-card:hover .game-overlay,
-        .game-card.selected .game-overlay {
-            opacity: 1;
-        }
-
-        .game-title {
-            font-size: 0.88rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            line-height: 1.3;
-            margin-bottom: 4px;
-        }
-
-        .game-system {
-            font-size: 0.68rem;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-        }
-
+        .game-card:hover .game-overlay, .game-card.selected .game-overlay { opacity: 1; }
+        .game-title { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 4px; }
+        .game-system { font-size: 0.68rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
         .play-hint {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 2.5rem;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-            color: #fff;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 2.5rem; opacity: 0; transition: opacity 0.2s ease; text-shadow: 0 2px 10px rgba(0,0,0,0.8); color: #fff;
         }
-
-        .game-card:hover .play-hint,
-        .game-card.selected .play-hint {
-            opacity: 0.9;
-        }
-
-        /* ===== BADGE ===== */
+        .game-card:hover .play-hint, .game-card.selected .play-hint { opacity: 0.9; }
         .badge {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(243, 156, 18, 0.9);
-            color: #000;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.62rem;
-            font-weight: 800;
-            letter-spacing: 1px;
-            text-transform: uppercase;
+            position: absolute; top: 8px; right: 8px; background: rgba(243, 156, 18, 0.9); color: #000;
+            padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
         }
-
-        /* ===== UPLOAD SECTION ===== */
-        .upload-section {
-            max-width: 600px;
-            margin: 20px auto;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 32px;
+        .delete-btn {
+            position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: #ff4444;
+            border: 1px solid rgba(255,68,68,0.5); border-radius: 4px; width: 24px; height: 24px;
+            font-size: 0.8rem; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1;
         }
-
-        .upload-section h2 {
-            font-size: 1.1rem;
-            margin-bottom: 8px;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .upload-section p {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            margin-bottom: 24px;
-        }
-
-        .upload-form {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .form-group label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            font-weight: 600;
-        }
-
+        .game-card:hover .delete-btn { display: flex; }
+        .delete-btn:hover { background: rgba(255,68,68,0.3); }
+        .upload-section { max-width: 600px; margin: 20px auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
+        .upload-section h2 { font-size: 1.1rem; margin-bottom: 8px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; }
+        .upload-section p { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 24px; }
+        .upload-form { display: flex; flex-direction: column; gap: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
         .form-group input[type="text"] {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px 14px;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            outline: none;
-            transition: border-color 0.2s;
+            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px;
+            padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;
         }
-
-        .form-group input[type="text"]:focus {
-            border-color: var(--accent);
-        }
-
+        .form-group input[type="text"]:focus { border-color: var(--accent); }
         .form-group select {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px 14px;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-            outline: none;
-            cursor: pointer;
+            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px;
+            padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; cursor: pointer;
         }
-
         .file-drop {
-            border: 2px dashed var(--border);
-            border-radius: 8px;
-            padding: 32px;
-            text-align: center;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s;
+            border: 2px dashed var(--border); border-radius: 8px; padding: 32px; text-align: center;
+            cursor: pointer; transition: border-color 0.2s, background 0.2s;
         }
-
-        .file-drop:hover {
-            border-color: var(--accent);
-            background: rgba(147, 112, 219, 0.05);
-        }
-
-        .file-drop.dragover {
-            border-color: var(--accent);
-            background: rgba(147, 112, 219, 0.1);
-        }
-
-        .file-drop .icon {
-            font-size: 2.5rem;
-            margin-bottom: 8px;
-            display: block;
-        }
-
-        .file-drop .text {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        .file-drop .filename {
-            font-size: 0.85rem;
-            color: var(--accent);
-            margin-top: 8px;
-            font-weight: 600;
-        }
-
+        .file-drop:hover { border-color: var(--accent); background: rgba(147, 112, 219, 0.05); }
+        .file-drop.dragover { border-color: var(--accent); background: rgba(147, 112, 219, 0.1); }
+        .file-drop .icon { font-size: 2.5rem; margin-bottom: 8px; display: block; }
+        .file-drop .text { font-size: 0.85rem; color: var(--text-secondary); }
+        .file-drop .filename { font-size: 0.85rem; color: var(--accent); margin-top: 8px; font-weight: 600; }
         .btn-add {
-            background: linear-gradient(135deg, var(--accent), #7b1fa2);
-            color: #fff;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: transform 0.15s, box-shadow 0.15s;
+            background: linear-gradient(135deg, var(--accent), #7b1fa2); color: #fff; border: none;
+            padding: 12px 24px; border-radius: 6px; font-size: 0.9rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
         }
-
-        .btn-add:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 16px var(--accent-glow);
-        }
-
-        .btn-add:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* ===== EMPTY STATE ===== */
-        .empty-state {
-            text-align: center;
-            padding: 80px 20px;
-            color: var(--text-dim);
-        }
-
-        .empty-state .icon {
-            font-size: 4rem;
-            margin-bottom: 16px;
-        }
-
-        /* ===== FOOTER ===== */
+        .btn-add:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+        .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+        .empty-state { text-align: center; padding: 80px 20px; color: var(--text-dim); }
+        .empty-state .icon { font-size: 4rem; margin-bottom: 16px; }
         .footer {
-            background: rgba(26, 26, 26, 0.85);
-            backdrop-filter: blur(12px);
-            border-top: 1px solid var(--border);
-            padding: 10px 32px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            flex-shrink: 0;
-            position: relative;
-            z-index: 100;
+            background: rgba(26, 26, 26, 0.85); backdrop-filter: blur(12px); border-top: 1px solid var(--border);
+            padding: 10px 32px; display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.75rem; color: var(--text-dim); flex-shrink: 0; position: relative; z-index: 100;
         }
-
-        .footer .controls-hint {
-            display: flex;
-            gap: 16px;
-        }
-
-        .footer .controls-hint span {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .key {
-            display: inline-block;
-            padding: 2px 8px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            font-family: monospace;
-        }
-
-        /* ===== TAB CONTENT ===== */
+        .footer .controls-hint { display: flex; gap: 16px; }
+        .footer .controls-hint span { display: flex; align-items: center; gap: 6px; }
+        .key { display: inline-block; padding: 2px 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .header { padding: 0 16px; height: 50px; }
             .logo { font-size: 1.1rem; }
@@ -484,21 +157,13 @@
             .footer .controls-hint { display: none; }
             .upload-section { padding: 20px; margin: 10px; }
         }
-
-        @media (max-width: 480px) {
-            .games-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        }
+        @media (max-width: 480px) { .games-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
     </style>
 </head>
 <body>
-    <!-- Animated background -->
     <div class="bg-animation">
-        <div class="bg-blob"></div>
-        <div class="bg-blob"></div>
-        <div class="bg-blob"></div>
-        <div class="bg-blob"></div>
+        <div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div>
     </div>
-
     <header class="header">
         <div class="header-left">
             <div class="logo">KANTASU<span>-</span>ROMS</div>
@@ -509,24 +174,14 @@
             </nav>
         </div>
     </header>
-
     <main class="main">
-        <!-- OG ROMs Tab -->
-        <div id="og-roms" class="tab-content active">
-            <div class="games-grid" id="og-grid"></div>
-        </div>
-
-        <!-- Rom Hacks Tab -->
-        <div id="rom-hacks" class="tab-content">
-            <div class="games-grid" id="hacks-grid"></div>
-        </div>
-
-        <!-- Your Games Tab -->
+        <div id="og-roms" class="tab-content active"><div class="games-grid" id="og-grid"></div></div>
+        <div id="rom-hacks" class="tab-content"><div class="games-grid" id="hacks-grid"></div></div>
         <div id="your-games" class="tab-content">
             <div class="games-grid" id="your-grid"></div>
             <div class="upload-section">
                 <h2>&#43; Add Your Game</h2>
-                <p>Upload your own ROM file (zip, z64, or n64) with a custom icon. Games are stored locally in your browser.</p>
+                <p>Upload your own ROM file (zip, z64, or n64) with a custom icon. Games are stored locally in your browser using IndexedDB.</p>
                 <div class="upload-form">
                     <div class="form-group">
                         <label for="game-name-input">Game Name</label>
@@ -535,7 +190,7 @@
                     <div class="form-group">
                         <label for="game-category">Category</label>
                         <select id="game-category">
-                            <option value="your-games">Base Game</option>
+                            <option value="og-roms">Base Game</option>
                             <option value="rom-hacks">Rom Hack</option>
                         </select>
                     </div>
@@ -562,7 +217,6 @@
             </div>
         </div>
     </main>
-
     <footer class="footer">
         <div>Kantasu-Roms &mdash; For educational use only</div>
         <div class="controls-hint">
@@ -571,55 +225,72 @@
             <span><span class="key">Esc</span> Back</span>
         </div>
     </footer>
-
     <script>
+        // ===== INDEXEDDB STORAGE (handles large ROM files) =====
+        const DB_NAME = 'kantasu_roms_db';
+        const DB_VERSION = 1;
+        let db = null;
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains('games')) {
+                        database.createObjectStore('games', { keyPath: 'id' });
+                    }
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        function dbAdd(game) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['games'], 'readwrite');
+                tx.objectStore('games').add(game);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        function dbGetAll() {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['games'], 'readonly');
+                const req = tx.objectStore('games').getAll();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        function dbDelete(id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['games'], 'readwrite');
+                tx.objectStore('games').delete(id);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
         // ===== BUILT-IN GAMES =====
         const builtinGames = {
             'og-roms': [
-                {
-                    title: 'Super Mario 64',
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/super-mario-64.z64',
-                    cover: 'icons/Super Mario 64.jpeg'
-                },
-                {
-                    title: "The Legend of Zelda: Ocarina of Time",
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/ocarina-of-time.z64',
-                    cover: 'icons/The Legend of Zelda - Ocarina of Time.jpeg'
-                },
-                {
-                    title: "The Legend of Zelda: Majora's Mask",
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/majoras-mask.z64',
-                    cover: "icons/The Legend of Zelda - Majora's Mask.jpeg"
-                },
-                {
-                    title: 'Banjo-Kazooie',
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/banjo-kazooie.n64',
-                    cover: 'icons/Banjo-Kazooie.jpeg'
-                }
+                { title: 'Super Mario 64', system: 'Nintendo 64', rom: 'roms/og-roms/super-mario-64.z64', cover: 'icons/Super Mario 64.jpeg' },
+                { title: "The Legend of Zelda: Ocarina of Time", system: 'Nintendo 64', rom: 'roms/og-roms/ocarina-of-time.z64', cover: 'icons/The Legend of Zelda - Ocarina of Time.jpeg' },
+                { title: "The Legend of Zelda: Majora's Mask", system: 'Nintendo 64', rom: 'roms/og-roms/majoras-mask.z64', cover: "icons/The Legend of Zelda - Majora's Mask.jpeg" },
+                { title: 'Banjo-Kazooie', system: 'Nintendo 64', rom: 'roms/og-roms/banjo-kazooie.n64', cover: 'icons/Banjo-Kazooie.jpeg' }
             ],
             'rom-hacks': []
         };
 
-        // ===== USER GAMES (stored in localStorage) =====
-        let userGames = JSON.parse(localStorage.getItem('kantasu_user_games') || '{"og-roms":[],"rom-hacks":[]}');
-        // userGames stored as 'og-roms' for base games, 'rom-hacks' for hacks
+        // ===== USER GAMES (loaded from IndexedDB) =====
+        let userGames = { 'og-roms': [], 'rom-hacks': [] };
 
         function getAllGames(tab) {
-            let combined = [...(builtinGames[tab] || [])];
-            // Add user games that match this tab
-            if (tab === 'og-roms') {
-                combined = combined.concat(userGames['og-roms'] || []);
-            } else if (tab === 'rom-hacks') {
-                combined = combined.concat(userGames['rom-hacks'] || []);
-            } else if (tab === 'your-games') {
-                // Show ALL user games in this tab
-                combined = (userGames['og-roms'] || []).concat(userGames['rom-hacks'] || []);
-            }
-            return combined;
+            if (tab === 'og-roms') return [...builtinGames['og-roms'], ...userGames['og-roms']];
+            if (tab === 'rom-hacks') return [...builtinGames['rom-hacks'], ...userGames['rom-hacks']];
+            if (tab === 'your-games') return [...userGames['og-roms'], ...userGames['rom-hacks']];
+            return [];
         }
 
         let selectedIndex = 0;
@@ -631,27 +302,19 @@
             card.className = 'game-card';
             card.tabIndex = 0;
             card.dataset.index = index;
-
             const badge = game.isUser ? '<div class="badge">Yours</div>' : '';
-            const isHack = (currentTab === 'rom-hacks') && !game.isUser;
-            const hackBadge = isHack ? '<div class="badge">Hack</div>' : '';
-
-            card.innerHTML = `
-                ${badge}${hackBadge}
-                <div class="game-cover">
-                    <img src="${game.cover}" alt="${game.title}" loading="lazy"
-                         onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>&#127918;</text></svg>'">
-                </div>
+            const hackBadge = (currentTab === 'rom-hacks' && !game.isUser) ? '<div class="badge">Hack</div>' : '';
+            const deleteBtn = game.isUser ? `<button class="delete-btn" data-id="${game.id}">&times;</button>` : '';
+            const cover = game.cover || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>&#127918;</text></svg>';
+            card.innerHTML = `${deleteBtn}${badge}${hackBadge}
+                <div class="game-cover"><img src="${cover}" alt="${game.title}" loading="lazy"></div>
                 <div class="play-hint">&#9654;</div>
-                <div class="game-overlay">
-                    <div class="game-title">${game.title}</div>
-                    <div class="game-system">${game.system || 'Nintendo 64'}</div>
-                </div>
-            `;
-
-            card.addEventListener('click', () => playGame(game));
+                <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>`;
+            card.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-btn')) { e.stopPropagation(); deleteUserGame(game.id); return; }
+                playGame(game);
+            });
             card.addEventListener('focus', () => selectCard(index));
-
             return card;
         }
 
@@ -659,23 +322,14 @@
             const gridId = tab === 'og-roms' ? 'og-grid' : tab === 'rom-hacks' ? 'hacks-grid' : 'your-grid';
             const grid = document.getElementById(gridId);
             if (!grid) return;
-
             grid.innerHTML = '';
             cards = [];
-
             const games = getAllGames(tab);
-
             if (games.length === 0) {
-                if (tab === 'your-games') return; // upload section is below
-                grid.innerHTML = '<div class="empty-state"><div class="icon">&#127918;</div><div>No games here yet</div></div>';
+                if (tab !== 'your-games') grid.innerHTML = '<div class="empty-state"><div class="icon">&#127918;</div><div>No games here yet</div></div>';
                 return;
             }
-
-            games.forEach((game, i) => {
-                const card = createGameCard(game, i);
-                grid.appendChild(card);
-                cards.push(card);
-            });
+            games.forEach((game, i) => { const card = createGameCard(game, i); grid.appendChild(card); cards.push(card); });
             selectCard(0);
         }
 
@@ -690,47 +344,43 @@
         }
 
         function playGame(game) {
-            window.location.href = `play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}`;
+            if (game.isUser) {
+                // For user games, create a blob URL from stored ROM data and redirect
+                const romBlob = game.romBlob;
+                const blobUrl = URL.createObjectURL(romBlob);
+                // Use session storage to pass the blob URL to play.html
+                sessionStorage.setItem('play_rom_url', blobUrl);
+                sessionStorage.setItem('play_rom_name', game.title);
+                window.location.href = 'play.html';
+            } else {
+                window.location.href = `play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}`;
+            }
         }
 
         // ===== TAB SWITCHING =====
         function switchTab(tabName) {
             currentTab = tabName;
-            document.querySelectorAll('.nav-item').forEach(item => {
-                item.classList.toggle('active', item.dataset.tab === tabName);
-            });
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.toggle('active', content.id === tabName);
-            });
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === tabName));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.id === tabName));
             renderGames(tabName);
         }
-
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', () => switchTab(item.dataset.tab));
-            item.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') switchTab(item.dataset.tab);
-            });
+            item.addEventListener('keydown', (e) => { if (e.key === 'Enter') switchTab(item.dataset.tab); });
         });
 
         // ===== KEYBOARD NAVIGATION =====
         document.addEventListener('keydown', (e) => {
-            // Don't interfere with form inputs
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
             if (cards.length === 0) return;
-
             const cols = Math.max(1, Math.floor(document.querySelector('.games-grid')?.offsetWidth / 200 || 1));
-
             switch(e.key) {
                 case 'ArrowRight': e.preventDefault(); selectCard(selectedIndex + 1); break;
                 case 'ArrowLeft': e.preventDefault(); selectCard(selectedIndex - 1); break;
                 case 'ArrowDown': e.preventDefault(); selectCard(selectedIndex + cols); break;
                 case 'ArrowUp': e.preventDefault(); selectCard(selectedIndex - cols); break;
-                case 'Enter':
-                case ' ':
-                    if (e.target.classList.contains('game-card')) {
-                        e.preventDefault();
-                        playGame(getAllGames(currentTab)[selectedIndex]);
-                    }
+                case 'Enter': case ' ':
+                    if (e.target.classList.contains('game-card')) { e.preventDefault(); playGame(getAllGames(currentTab)[selectedIndex]); }
                     break;
             }
         });
@@ -738,30 +388,23 @@
         // ===== GAMEPAD SUPPORT =====
         let lastInputTime = 0;
         const INPUT_DELAY = 200;
-
         function pollGamepad() {
             const pads = navigator.getGamepads ? navigator.getGamepads() : [];
             for (let pad of pads) {
                 if (!pad) continue;
                 const now = Date.now();
                 if (now - lastInputTime < INPUT_DELAY) break;
-
                 const deadzone = 0.5;
                 const up = pad.buttons[12]?.pressed || pad.axes[1] < -deadzone;
                 const down = pad.buttons[13]?.pressed || pad.axes[1] > deadzone;
                 const left = pad.buttons[14]?.pressed || pad.axes[0] < -deadzone;
                 const right = pad.buttons[15]?.pressed || pad.axes[0] > deadzone;
-
                 const cols = Math.max(1, Math.floor(document.querySelector('.games-grid')?.offsetWidth / 200 || 1));
-
                 if (up) { selectCard(selectedIndex - cols); lastInputTime = now; }
                 if (down) { selectCard(selectedIndex + cols); lastInputTime = now; }
                 if (left) { selectCard(selectedIndex - 1); lastInputTime = now; }
                 if (right) { selectCard(selectedIndex + 1); lastInputTime = now; }
-                if (pad.buttons[0]?.pressed) {
-                    if (cards.length > 0) playGame(getAllGames(currentTab)[selectedIndex]);
-                    lastInputTime = now;
-                }
+                if (pad.buttons[0]?.pressed && cards.length > 0) { playGame(getAllGames(currentTab)[selectedIndex]); lastInputTime = now; }
                 break;
             }
             requestAnimationFrame(pollGamepad);
@@ -769,142 +412,98 @@
         requestAnimationFrame(pollGamepad);
 
         // ===== UPLOAD FUNCTIONALITY =====
-        let iconData = null;
-        let romData = null;
+        let iconFile = null;
+        let romFile = null;
 
         function setupFileDrop(dropId, inputId, filenameId, callback) {
             const drop = document.getElementById(dropId);
             const input = document.getElementById(inputId);
             const filenameLabel = document.getElementById(filenameId);
-
             drop.addEventListener('click', () => input.click());
-
-            drop.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                drop.classList.add('dragover');
-            });
-
+            drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
             drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-
             drop.addEventListener('drop', (e) => {
-                e.preventDefault();
-                drop.classList.remove('dragover');
-                if (e.dataTransfer.files.length > 0) {
-                    input.files = e.dataTransfer.files;
-                    input.dispatchEvent(new Event('change'));
-                }
+                e.preventDefault(); drop.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change')); }
             });
-
             input.addEventListener('change', () => {
-                if (input.files.length > 0) {
-                    const file = input.files[0];
-                    filenameLabel.textContent = file.name;
-                    callback(file);
-                    checkAddButton();
-                }
+                if (input.files.length > 0) { filenameLabel.textContent = input.files[0].name; callback(input.files[0]); checkAddButton(); }
             });
         }
 
-        setupFileDrop('icon-drop', 'icon-input', 'icon-filename', (file) => {
-            const reader = new FileReader();
-            reader.onload = (e) => { iconData = e.target.result; };
-            reader.readAsDataURL(file);
-        });
-
-        setupFileDrop('rom-drop', 'rom-input', 'rom-filename', (file) => {
-            const reader = new FileReader();
-            reader.onload = (e) => { romData = e.target.result; };
-            reader.readAsDataURL(file);
-        });
+        setupFileDrop('icon-drop', 'icon-input', 'icon-filename', (file) => { iconFile = file; });
+        setupFileDrop('rom-drop', 'rom-input', 'rom-filename', (file) => { romFile = file; });
 
         function checkAddButton() {
             const name = document.getElementById('game-name-input').value.trim();
-            const btn = document.getElementById('add-game-btn');
-            btn.disabled = !(name && iconData && romData);
+            document.getElementById('add-game-btn').disabled = !(name && iconFile && romFile);
         }
-
         document.getElementById('game-name-input').addEventListener('input', checkAddButton);
 
-        document.getElementById('add-game-btn').addEventListener('click', () => {
+        document.getElementById('add-game-btn').addEventListener('click', async () => {
             const name = document.getElementById('game-name-input').value.trim();
             const category = document.getElementById('game-category').value;
+            if (!name || !iconFile || !romFile) return;
 
-            if (!name || !iconData || !romData) return;
+            // Read icon as data URL (small, safe for localStorage)
+            const iconDataUrl = await new Promise(resolve => {
+                const r = new FileReader(); r.onload = e => resolve(e.target.result); r.readAsDataURL(iconFile);
+            });
 
-            // Create blob URL from stored ROM data
-            const romBlob = dataURLtoBlob(romData);
-            const romUrl = URL.createObjectURL(romBlob);
-
-            const newGame = {
+            // Store ROM as Blob in IndexedDB (handles large files)
+            const gameId = 'game_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const gameRecord = {
+                id: gameId,
                 title: name,
                 system: 'Nintendo 64',
-                rom: romUrl,
-                cover: iconData,
+                category: category,
+                cover: iconDataUrl,
+                romBlob: romFile,  // Store as Blob directly
                 isUser: true
             };
 
-            // Store in userGames
-            if (!userGames[category]) userGames[category] = [];
-            userGames[category].push(newGame);
-
-            // Also store in localStorage for persistence (without blob URL)
-            const storedGame = { ...newGame };
-            // We can't store blob URLs in localStorage, so store the data URL
-            storedGame.rom = romData;
-            storedGame.cover = iconData;
-            let stored = JSON.parse(localStorage.getItem('kantasu_user_games') || '{"og-roms":[],"rom-hacks":[]}');
-            if (!stored[category]) stored[category] = [];
-            stored[category].push(storedGame);
-            localStorage.setItem('kantasu_user_games', JSON.stringify(stored));
-
-            // Clear form
-            document.getElementById('game-name-input').value = '';
-            document.getElementById('icon-filename').textContent = '';
-            document.getElementById('rom-filename').textContent = '';
-            document.getElementById('icon-input').value = '';
-            document.getElementById('rom-input').value = '';
-            iconData = null;
-            romData = null;
-            checkAddButton();
-
-            // Re-render
-            renderGames('your-games');
-            renderGames(category);
-
-            alert('Game added! Switch to the ' + (category === 'rom-hacks' ? 'Rom Hacks' : 'Games') + ' tab to play it.');
+            try {
+                await dbAdd(gameRecord);
+                // Also keep in memory for current session
+                userGames[category].push({ ...gameRecord, romBlob: romFile });
+                // Clear form
+                document.getElementById('game-name-input').value = '';
+                document.getElementById('icon-filename').textContent = '';
+                document.getElementById('rom-filename').textContent = '';
+                document.getElementById('icon-input').value = '';
+                document.getElementById('rom-input').value = '';
+                iconFile = null; romFile = null;
+                checkAddButton();
+                renderGames('your-games'); renderGames(category);
+                alert('Game added successfully!');
+            } catch (err) {
+                alert('Error saving game: ' + err.message);
+            }
         });
 
-        function dataURLtoBlob(dataURL) {
-            const arr = dataURL.split(',');
-            const mime = arr[0].match(/:(.*?);/)[1];
-            const bstr = atob(arr[1]);
-            const u8 = new Uint8Array(bstr.length);
-            for (let i = 0; i < bstr.length; i++) u8[i] = bstr.charCodeAt(i);
-            return new Blob([u8], { type: mime });
-        }
-
-        // ===== RESTORE USER GAMES FROM LOCALSTORAGE =====
-        function restoreUserGames() {
-            const stored = JSON.parse(localStorage.getItem('kantasu_user_games') || '{"og-roms":[],"rom-hacks":[]}');
+        async function deleteUserGame(id) {
+            if (!confirm('Delete this game?')) return;
+            await dbDelete(id);
             for (const cat of ['og-roms', 'rom-hacks']) {
-                if (stored[cat]) {
-                    userGames[cat] = stored[cat].map(g => {
-                        // Recreate blob URL from stored data
-                        if (g.rom && g.rom.startsWith('data:')) {
-                            const blob = dataURLtoBlob(g.rom);
-                            return { ...g, rom: URL.createObjectURL(blob) };
-                        }
-                        return g;
-                    });
-                }
+                userGames[cat] = userGames[cat].filter(g => g.id !== id);
             }
+            renderGames('your-games'); renderGames('og-roms'); renderGames('rom-hacks');
         }
 
         // ===== INIT =====
-        restoreUserGames();
-        renderGames('og-roms');
-        renderGames('rom-hacks');
-        renderGames('your-games');
+        async function init() {
+            await openDB();
+            // Load user games from IndexedDB
+            const stored = await dbGetAll();
+            for (const g of stored) {
+                if (!userGames[g.category]) userGames[g.category] = [];
+                userGames[g.category].push(g);
+            }
+            renderGames('og-roms');
+            renderGames('rom-hacks');
+            renderGames('your-games');
+        }
+        init();
     </script>
 </body>
 </html>

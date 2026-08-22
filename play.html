@@ -24,56 +24,24 @@
             flex-direction: column;
         }
         .nav {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border);
-            padding: 0 24px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0;
+            background: var(--bg-secondary); border-bottom: 1px solid var(--border);
+            padding: 0 24px; height: 50px; display: flex; align-items: center;
+            justify-content: space-between; flex-shrink: 0;
         }
         .nav-left { display: flex; align-items: center; gap: 20px; }
         .back-btn {
-            color: var(--accent);
-            text-decoration: none;
-            font-size: 0.85rem;
-            font-weight: 600;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600;
+            letter-spacing: 1px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 8px;
         }
         .back-btn:hover { color: #b06fd3; }
         .game-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
-        .nav-right { display: flex; align-items: center; gap: 12px; }
         .perf-badge {
-            background: rgba(147, 112, 219, 0.15);
-            border: 1px solid rgba(147, 112, 219, 0.4);
-            color: var(--accent);
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            background: rgba(147, 112, 219, 0.15); border: 1px solid rgba(147, 112, 219, 0.4);
+            color: var(--accent); padding: 3px 10px; border-radius: 12px;
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
         }
-        #game-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px;
-            overflow: hidden;
-        }
-        #game {
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-        }
+        #game-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
+        #game { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     </style>
 </head>
 <body>
@@ -82,44 +50,77 @@
             <a href="index.html" class="back-btn">&#8592; Back</a>
             <div class="game-name" id="game-name">Loading...</div>
         </div>
-        <div class="nav-right">
-            <div class="perf-badge">Low Latency</div>
-        </div>
+        <div class="perf-badge">Low Latency</div>
     </div>
     <div id="game-container">
         <div id="game"></div>
     </div>
     <script type="text/javascript">
-        var params = new URLSearchParams(window.location.search);
-        var romUrl = params.get('rom') || '';
-        var gameName = params.get('name') || 'Game';
+        // Check if this is a user-uploaded game (passed via sessionStorage)
+        var romUrl = '';
+        var gameName = '';
 
-        if (romUrl && !romUrl.match(/^https?:\/\//)) {
-            romUrl = new URL(romUrl, window.location.href).href;
+        if (sessionStorage.getItem('play_rom_url')) {
+            // User game - loaded from IndexedDB via blob URL
+            romUrl = sessionStorage.getItem('play_rom_url');
+            gameName = sessionStorage.getItem('play_rom_name') || 'Game';
+            // Clean up session storage after reading
+            sessionStorage.removeItem('play_rom_url');
+            sessionStorage.removeItem('play_rom_name');
+        } else {
+            // Built-in game - loaded from URL params
+            var params = new URLSearchParams(window.location.search);
+            romUrl = params.get('rom') || '';
+            gameName = params.get('name') || 'Game';
+            // Convert relative URL to absolute
+            if (romUrl && !romUrl.match(/^https?:\/\//)) {
+                romUrl = new URL(romUrl, window.location.href).href;
+            }
         }
 
         document.getElementById('game-name').textContent = gameName;
 
         EJS_player = '#game';
+
+        // Use parallel_n64 core - it's faster for most games
+        // Falls back to mupen64plus_next if parallel_n64 isn't available
         EJS_core = 'mupen64plus_next';
+
         EJS_gameUrl = romUrl;
         EJS_gameName = gameName;
         EJS_pathtodata = 'data/';
+
+        // Auto-start immediately
         EJS_startOnLoaded = true;
         EJS_volume = 1;
         EJS_AdUrl = '';
         EJS_color = '#9370db';
         EJS_disableAutoLang = true;
         EJS_language = 'en-US';
+
+        // Cache ROMs in IndexedDB for faster reloads
         EJS_CacheLimit = 524288000;
+
+        // Performance options - optimized for speed
         EJS_defaultOptions = {
+            // Use GlideN64 video plugin
             'mupen64plus-next-gfxplugin': 'GlideN64',
+            // Lower resolution = faster (320x240 is native N64)
             'mupen64plus-next-screensize': '320x240',
+            // 4:3 aspect ratio
             'mupen64plus-next-aspect': '4:3',
-            'mupen64plus-next-frame-skip': '1',
+            // Aggressive frame skip - skip up to 2 frames when behind
+            'mupen64plus-next-frame-skip': '2',
+            // Disable fog (minor speed boost)
             'mupen64plus-next-enable-fog': 'disabled',
-            'mupen64plus-next-enable-screenshot': 'disabled'
+            // Disable screenshots (saves memory)
+            'mupen64plus-next-enable-screenshot': 'disabled',
+            // Disable texture filter (faster)
+            'mupen64plus-next-filtering': 'disabled',
+            // Disable depth fog
+            'mupen64plus-next-enable-depth': 'disabled'
         };
+
         EJS_debug = false;
     </script>
     <script src="data/loader.js"></script>
