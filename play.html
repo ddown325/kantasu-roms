@@ -6,45 +6,85 @@
     <title>Kantasu-Roms - Player</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0d0d0d;
+            --bg-secondary: #1a1a1a;
+            --accent: #9370db;
+            --text-primary: #ffffff;
+            --text-secondary: #8a8a8a;
+            --border: #2a2a2a;
+        }
+        html, body { height: 100%; overflow: hidden; }
         body {
-            background: #1a0a2e;
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #e0d0ff;
+            background: var(--bg-primary);
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
             display: flex;
             flex-direction: column;
-            align-items: center;
         }
         .nav {
-            background: linear-gradient(90deg, #6a0dad 0%, #8a2be2 50%, #9370db 100%);
-            width: 100%;
-            padding: 12px 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 50px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
+            flex-shrink: 0;
         }
-        .nav a { color: #fff; text-decoration: none; font-size: 1.1rem; font-weight: 600; }
-        .nav .game-name { color: #e6e6fa; font-size: 1rem; }
-        .nav .perf-badge {
-            background: rgba(0, 255, 100, 0.2);
-            border: 1px solid rgba(0, 255, 100, 0.5);
-            color: #00ff88;
+        .nav-left { display: flex; align-items: center; gap: 20px; }
+        .back-btn {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .back-btn:hover { color: #b06fd3; }
+        .game-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+        .nav-right { display: flex; align-items: center; gap: 12px; }
+        .perf-badge {
+            background: rgba(147, 112, 219, 0.15);
+            border: 1px solid rgba(147, 112, 219, 0.4);
+            color: var(--accent);
             padding: 3px 10px;
             border-radius: 12px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-        #game-container { width: 100%; max-width: 1000px; margin: 10px auto; padding: 0 10px; }
-        #game { width: 100%; height: 620px; max-height: 85vh; }
-        @media (max-width: 600px) { #game { height: 420px; } .nav .game-name { font-size: 0.85rem; } .nav .perf-badge { display: none; } }
+        #game-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            overflow: hidden;
+        }
+        #game {
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+        }
     </style>
 </head>
 <body>
     <div class="nav">
-        <a href="index.html">&larr; Kantasu-Roms</a>
-        <div class="game-name" id="game-name">Loading...</div>
-        <div class="perf-badge">&#9889; LOW LATENCY</div>
+        <div class="nav-left">
+            <a href="index.html" class="back-btn">&#8592; Back</a>
+            <div class="game-name" id="game-name">Loading...</div>
+        </div>
+        <div class="nav-right">
+            <div class="perf-badge">Low Latency</div>
+        </div>
     </div>
     <div id="game-container">
         <div id="game"></div>
@@ -54,7 +94,6 @@
         var romUrl = params.get('rom') || '';
         var gameName = params.get('name') || 'Game';
 
-        // Convert relative ROM URL to absolute URL
         if (romUrl && !romUrl.match(/^https?:\/\//)) {
             romUrl = new URL(romUrl, window.location.href).href;
         }
@@ -66,35 +105,21 @@
         EJS_gameUrl = romUrl;
         EJS_gameName = gameName;
         EJS_pathtodata = 'data/';
-
-        // Auto-start immediately
         EJS_startOnLoaded = true;
         EJS_volume = 1;
         EJS_AdUrl = '';
-        EJS_color = '#8a2be2';
+        EJS_color = '#9370db';
         EJS_disableAutoLang = true;
         EJS_language = 'en-US';
-
-        // Cache ROMs in IndexedDB (500MB) for instant reloads
         EJS_CacheLimit = 524288000;
-
-        // Core-specific performance options
-        // Note: audio_latency and video_vsync are already patched in emulator.min.js
         EJS_defaultOptions = {
-            // Use GlideN64 video plugin (best compatibility with WebGL2)
             'mupen64plus-next-gfxplugin': 'GlideN64',
-            // Native N64 resolution (320x240) for maximum speed
             'mupen64plus-next-screensize': '320x240',
-            // 4:3 aspect ratio (original)
             'mupen64plus-next-aspect': '4:3',
-            // Frame skip: skip 1 frame when behind (smooth gameplay)
             'mupen64plus-next-frame-skip': '1',
-            // Disable fog (minor speed boost)
             'mupen64plus-next-enable-fog': 'disabled',
-            // Disable screenshots (saves memory)
             'mupen64plus-next-enable-screenshot': 'disabled'
         };
-
         EJS_debug = false;
     </script>
     <script src="data/loader.js"></script>

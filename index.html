@@ -11,308 +11,484 @@
             box-sizing: border-box;
         }
 
+        :root {
+            --bg-primary: #0d0d0d;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #1e1e1e;
+            --accent: #9370db;
+            --accent-hover: #b06fd3;
+            --accent-glow: rgba(147, 112, 219, 0.4);
+            --text-primary: #ffffff;
+            --text-secondary: #8a8a8a;
+            --text-dim: #555555;
+            --border: #2a2a2a;
+            --border-selected: #ffffff;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
-            background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #e0d0ff;
-        }
-
-        .header {
-            background: linear-gradient(90deg, #6a0dad 0%, #8a2be2 50%, #9370db 100%);
-            padding: 30px 20px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
-            border-bottom: 3px solid #dda0dd;
-        }
-
-        .header h1 {
-            font-size: 2.5rem;
-            color: #fff;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(186, 85, 211, 0.8);
-            letter-spacing: 2px;
-        }
-
-        .header .subtitle {
-            color: #e6e6fa;
-            font-size: 1rem;
-            margin-top: 8px;
-            opacity: 0.9;
-        }
-
-        .tabs {
+            background: var(--bg-primary);
+            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             display: flex;
-            justify-content: center;
-            gap: 10px;
-            padding: 20px;
-            background: rgba(26, 10, 46, 0.8);
-            position: sticky;
-            top: 0;
+            flex-direction: column;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
             z-index: 100;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(186, 85, 211, 0.3);
         }
 
-        .tab-btn {
-            padding: 12px 32px;
-            font-size: 1.1rem;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+
+        .logo {
+            font-size: 1.3rem;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .nav {
+            display: flex;
+            gap: 28px;
+        }
+
+        .nav-item {
+            font-size: 0.82rem;
             font-weight: 600;
-            border: 2px solid #8a2be2;
-            border-radius: 8px;
-            background: transparent;
-            color: #e0d0ff;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.3s ease;
+            padding: 4px 0;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s, border-color 0.2s;
+            user-select: none;
         }
 
-        .tab-btn:hover {
-            background: rgba(138, 43, 226, 0.2);
-            transform: translateY(-2px);
+        .nav-item:hover,
+        .nav-item.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
         }
 
-        .tab-btn.active {
-            background: linear-gradient(135deg, #8a2be2, #9370db);
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(138, 43, 226, 0.5);
+        .nav-item:focus {
+            outline: none;
+            color: var(--accent);
         }
 
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 24px 32px;
+        }
+
+        .main::-webkit-scrollbar {
+            width: 8px;
+        }
+        .main::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+        .main::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        .main::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* ===== GAME GRID ===== */
         .games-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
-            padding: 30px;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
             max-width: 1400px;
             margin: 0 auto;
         }
 
         .game-card {
-            background: linear-gradient(145deg, rgba(40, 20, 60, 0.9), rgba(30, 15, 50, 0.9));
-            border: 1px solid rgba(147, 112, 219, 0.3);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.3s ease;
             position: relative;
+            aspect-ratio: 4 / 5;
+            background: var(--bg-card);
+            border-radius: 4px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            outline: none;
+            border: 3px solid transparent;
         }
 
         .game-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(138, 43, 226, 0.3);
-            border-color: #9370db;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .game-card.selected,
+        .game-card:focus-visible {
+            border-color: var(--border-selected);
+            box-shadow: 0 0 0 2px var(--bg-primary), 0 0 20px var(--accent-glow);
+        }
+
+        .game-card.selected {
+            transform: scale(1.03);
         }
 
         .game-cover {
+            position: absolute;
+            inset: 0;
             width: 100%;
-            height: 280px;
-            background: linear-gradient(135deg, #2a1a3e, #1a0a2e);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            height: 100%;
+            object-fit: cover;
         }
 
         .game-cover img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-        }
-
-        .game-cover .placeholder {
-            font-size: 4rem;
-            color: #9370db;
-            opacity: 0.5;
-        }
-
-        .game-info {
-            padding: 15px;
-        }
-
-        .game-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #e6e6fa;
-            margin-bottom: 5px;
-        }
-
-        .game-system {
-            font-size: 0.85rem;
-            color: #b8860b;
-            margin-bottom: 15px;
-        }
-
-        .game-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn {
-            flex: 1;
-            padding: 10px;
-            text-align: center;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            cursor: pointer;
-            border: none;
-        }
-
-        .btn-play {
-            background: linear-gradient(135deg, #8a2be2, #9370db);
-            color: #fff;
-        }
-
-        .btn-play:hover {
-            background: linear-gradient(135deg, #9370db, #ba55d3);
-        }
-
-        .btn-download {
-            background: rgba(147, 112, 219, 0.2);
-            color: #e6e6fa;
-            border: 1px solid rgba(147, 112, 219, 0.5);
-        }
-
-        .btn-download:hover {
-            background: rgba(147, 112, 219, 0.4);
-        }
-
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
-
-        .tab-content.active {
             display: block;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .badge {
+        .game-overlay {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.75rem;
+            inset: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 12px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .game-card:hover .game-overlay,
+        .game-card.selected .game-overlay {
+            opacity: 1;
+        }
+
+        .game-title {
+            font-size: 0.95rem;
             font-weight: 700;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            color: var(--text-primary);
+            line-height: 1.3;
+            margin-bottom: 4px;
         }
 
-        .badge-hack {
-            background: linear-gradient(135deg, #f39c12, #e67e22);
+        .game-system {
+            font-size: 0.72rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
         }
 
-        .footer {
+        .play-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .game-card:hover .play-hint,
+        .game-card.selected .play-hint {
+            opacity: 0.9;
+        }
+
+        /* ===== EMPTY STATE ===== */
+        .empty-state {
             text-align: center;
-            padding: 20px;
-            color: #9370db;
-            font-size: 0.85rem;
-            border-top: 1px solid rgba(147, 112, 219, 0.2);
-            margin-top: 20px;
+            padding: 80px 20px;
+            color: var(--text-dim);
         }
 
-        @media (max-width: 600px) {
-            .header h1 { font-size: 1.8rem; }
-            .games-grid { padding: 15px; gap: 15px; }
-            .tab-btn { padding: 10px 20px; font-size: 0.95rem; }
+        .empty-state .icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        /* ===== FOOTER ===== */
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: 10px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .footer .controls-hint {
+            display: flex;
+            gap: 16px;
+        }
+
+        .footer .controls-hint span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .header { padding: 0 16px; height: 50px; }
+            .logo { font-size: 1.1rem; }
+            .nav { gap: 16px; }
+            .nav-item { font-size: 0.72rem; letter-spacing: 1px; }
+            .main { padding: 16px; }
+            .games-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+            .game-title { font-size: 0.82rem; }
+            .footer { padding: 8px 16px; }
+            .footer .controls-hint { display: none; }
+        }
+
+        @media (max-width: 480px) {
+            .games-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🎮 Kantasu-Roms</h1>
-        <div class="subtitle">N64 Game Collection &mdash; Play in your browser</div>
-    </div>
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">KANTASU<span>-</span>ROMS</div>
+            <nav class="nav" role="navigation">
+                <div class="nav-item active" data-tab="og-roms" tabindex="0">Games</div>
+            </nav>
+        </div>
+    </header>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('og-roms', event)">OG Roms</button>
-    </div>
+    <main class="main">
+        <div class="games-grid" id="games-grid"></div>
+    </main>
 
-    <div id="og-roms" class="tab-content active">
-        <div class="games-grid" id="og-grid"></div>
-    </div>
-
-    <div class="footer">
-        Kantasu-Roms &mdash; EmulatorJS powered &mdash; For educational purposes only
-    </div>
+    <footer class="footer">
+        <div>Kantasu-Roms &mdash; For educational use only</div>
+        <div class="controls-hint">
+            <span><span class="key">&#8592;&#8594;</span> Navigate</span>
+            <span><span class="key">Enter</span> Play</span>
+            <span><span class="key">Esc</span> Back</span>
+        </div>
+    </footer>
 
     <script>
-        const games = {
-            'og-roms': [
-                {
-                    title: 'Super Mario 64',
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/super-mario-64.z64',
-                    cover: 'icons/Super Mario 64.jpeg'
-                },
-                {
-                    title: "The Legend of Zelda: Ocarina of Time",
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/ocarina-of-time.z64',
-                    cover: 'icons/The Legend of Zelda - Ocarina of Time.jpeg'
-                },
-                {
-                    title: "The Legend of Zelda: Majora's Mask",
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/majoras-mask.z64',
-                    cover: "icons/The Legend of Zelda - Majora's Mask.jpeg"
-                },
-                {
-                    title: 'Banjo-Kazooie',
-                    system: 'Nintendo 64',
-                    rom: 'roms/og-roms/banjo-kazooie.n64',
-                    cover: 'icons/Banjo-Kazooie.jpeg'
-                }
-            ]
-        };
+        const games = [
+            {
+                title: 'Super Mario 64',
+                system: 'Nintendo 64',
+                rom: 'roms/og-roms/super-mario-64.z64',
+                cover: 'icons/Super Mario 64.jpeg'
+            },
+            {
+                title: "The Legend of Zelda: Ocarina of Time",
+                system: 'Nintendo 64',
+                rom: 'roms/og-roms/ocarina-of-time.z64',
+                cover: 'icons/The Legend of Zelda - Ocarina of Time.jpeg'
+            },
+            {
+                title: "The Legend of Zelda: Majora's Mask",
+                system: 'Nintendo 64',
+                rom: 'roms/og-roms/majoras-mask.z64',
+                cover: "icons/The Legend of Zelda - Majora's Mask.jpeg"
+            },
+            {
+                title: 'Banjo-Kazooie',
+                system: 'Nintendo 64',
+                rom: 'roms/og-roms/banjo-kazooie.n64',
+                cover: 'icons/Banjo-Kazooie.jpeg'
+            }
+        ];
 
-        function createGameCard(game) {
+        let selectedIndex = 0;
+        let cards = [];
+
+        function createGameCard(game, index) {
             const card = document.createElement('div');
             card.className = 'game-card';
-
-            const badge = game.badge
-                ? `<div class="badge ${game.badgeClass || ''}">${game.badge}</div>`
-                : '';
+            card.tabIndex = 0;
+            card.dataset.index = index;
 
             card.innerHTML = `
-                ${badge}
                 <div class="game-cover">
-                    <img src="${game.cover}" alt="${game.title}" onerror="this.parentElement.innerHTML='<div class=placeholder>🎮</div>'">
+                    <img src="${game.cover}" alt="${game.title}" loading="lazy"
+                         onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22250%22><rect fill=%22%231e1e1e%22 width=%22200%22 height=%22250%22/><text x=%22100%22 y=%22125%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22>&#127918;</text></svg>'">
                 </div>
-                <div class="game-info">
+                <div class="play-hint">&#9654;</div>
+                <div class="game-overlay">
                     <div class="game-title">${game.title}</div>
                     <div class="game-system">${game.system}</div>
-                    <div class="game-actions">
-                        <a href="play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}" class="btn btn-play">▶ Play</a>
-                        <a href="${game.rom}" download class="btn btn-download">⬇ Download</a>
-                    </div>
                 </div>
             `;
+
+            card.addEventListener('click', () => playGame(game));
+            card.addEventListener('focus', () => selectCard(index));
+
             return card;
         }
 
-        function renderGames(tabName) {
-            const grid = document.getElementById(tabName === 'og-roms' ? 'og-grid' : 'hack-grid');
+        function renderGames() {
+            const grid = document.getElementById('games-grid');
             grid.innerHTML = '';
-            games[tabName].forEach(game => {
-                grid.appendChild(createGameCard(game));
+            cards = [];
+            games.forEach((game, i) => {
+                const card = createGameCard(game, i);
+                grid.appendChild(card);
+                cards.push(card);
             });
+            selectCard(0);
         }
 
-        function switchTab(tabName, event) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-
-            event.currentTarget.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
+        function selectCard(index) {
+            if (index < 0) index = games.length - 1;
+            if (index >= games.length) index = 0;
+            selectedIndex = index;
+            cards.forEach((c, i) => {
+                c.classList.toggle('selected', i === index);
+            });
+            cards[index].focus({ preventScroll: false });
+            cards[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
 
-        renderGames('og-roms');
+        function playGame(game) {
+            window.location.href = `play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}`;
+        }
+
+        // ===== KEYBOARD / CONTROLLER NAVIGATION =====
+        document.addEventListener('keydown', (e) => {
+            if (cards.length === 0) return;
+
+            const cols = Math.floor(document.querySelector('.games-grid').offsetWidth / 220);
+            const effectiveCols = Math.max(1, cols);
+
+            switch(e.key) {
+                case 'ArrowRight':
+                    e.preventDefault();
+                    selectCard(selectedIndex + 1);
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    selectCard(selectedIndex - 1);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    selectCard(selectedIndex + effectiveCols);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    selectCard(selectedIndex - effectiveCols);
+                    break;
+                case 'Enter':
+                case ' ':
+                    e.preventDefault();
+                    playGame(games[selectedIndex]);
+                    break;
+            }
+        });
+
+        // ===== GAMEPAD SUPPORT =====
+        let gamepadConnected = false;
+        let lastInputTime = 0;
+        const INPUT_DELAY = 200; // ms between gamepad navigations
+
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log('Gamepad connected:', e.gamepad.id);
+            gamepadConnected = true;
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log('Gamepad disconnected');
+            gamepadConnected = false;
+        });
+
+        function pollGamepad() {
+            const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+            for (let pad of pads) {
+                if (!pad) continue;
+
+                const now = Date.now();
+                if (now - lastInputTime < INPUT_DELAY) break;
+
+                // D-pad and left stick
+                const deadzone = 0.5;
+                const up = pad.buttons[12]?.pressed || pad.axes[1] < -deadzone;
+                const down = pad.buttons[13]?.pressed || pad.axes[1] > deadzone;
+                const left = pad.buttons[14]?.pressed || pad.axes[0] < -deadzone;
+                const right = pad.buttons[15]?.pressed || pad.axes[0] > deadzone;
+
+                if (up) {
+                    const cols = Math.floor(document.querySelector('.games-grid').offsetWidth / 220);
+                    selectCard(selectedIndex - Math.max(1, cols));
+                    lastInputTime = now;
+                }
+                if (down) {
+                    const cols = Math.floor(document.querySelector('.games-grid').offsetWidth / 220);
+                    selectCard(selectedIndex + Math.max(1, cols));
+                    lastInputTime = now;
+                }
+                if (left) {
+                    selectCard(selectedIndex - 1);
+                    lastInputTime = now;
+                }
+                if (right) {
+                    selectCard(selectedIndex + 1);
+                    lastInputTime = now;
+                }
+
+                // A button (button 0) = play
+                if (pad.buttons[0]?.pressed) {
+                    playGame(games[selectedIndex]);
+                    lastInputTime = now;
+                }
+
+                break;
+            }
+            requestAnimationFrame(pollGamepad);
+        }
+
+        // Start gamepad polling
+        requestAnimationFrame(pollGamepad);
+
+        // ===== INIT =====
+        renderGames();
     </script>
 </body>
 </html>
