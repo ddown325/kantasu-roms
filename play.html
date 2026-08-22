@@ -7,46 +7,23 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg-primary: #0d0d0d;
-            --bg-secondary: #1a1a1a;
-            --accent: #9370db;
-            --text-primary: #ffffff;
-            --text-secondary: #8a8a8a;
-            --border: #2a2a2a;
+            --bg-primary: #0d0d0d; --bg-secondary: #1a1a1a; --accent: #9370db;
+            --text-primary: #ffffff; --text-secondary: #8a8a8a; --border: #2a2a2a;
         }
         html, body { height: 100%; overflow: hidden; }
         body {
-            background: var(--bg-primary);
-            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-            color: var(--text-primary);
-            -webkit-font-smoothing: antialiased;
-            display: flex;
-            flex-direction: column;
+            background: var(--bg-primary); font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text-primary); -webkit-font-smoothing: antialiased;
+            display: flex; flex-direction: column;
         }
-        .nav {
-            background: var(--bg-secondary); border-bottom: 1px solid var(--border);
-            padding: 0 24px; height: 50px; display: flex; align-items: center;
-            justify-content: space-between; flex-shrink: 0;
-        }
+        .nav { background: var(--bg-secondary); border-bottom: 1px solid var(--border); padding: 0 24px; height: 50px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
         .nav-left { display: flex; align-items: center; gap: 20px; }
-        .back-btn {
-            color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600;
-            letter-spacing: 1px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 8px;
-        }
+        .back-btn { color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 8px; }
         .back-btn:hover { color: #b06fd3; }
         .game-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
-        .perf-badge {
-            background: rgba(147, 112, 219, 0.15); border: 1px solid rgba(147, 112, 219, 0.4);
-            color: var(--accent); padding: 3px 10px; border-radius: 12px;
-            font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;
-        }
+        .perf-badge { background: rgba(147, 112, 219, 0.15); border: 1px solid rgba(147, 112, 219, 0.4); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         #game-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
         #game { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
-        #loading-overlay {
-            position: absolute; inset: 0; background: var(--bg-primary);
-            display: flex; align-items: center; justify-content: center; z-index: 9999;
-            color: var(--accent); font-size: 1.2rem;
-        }
     </style>
 </head>
 <body>
@@ -55,25 +32,22 @@
             <a href="index.html" class="back-btn">&#8592; Back</a>
             <div class="game-name" id="game-name">Loading...</div>
         </div>
-        <div class="perf-badge">Low Latency</div>
+        <div class="perf-badge">Max Performance</div>
     </div>
     <div id="game-container">
         <div id="game"></div>
     </div>
     <script type="text/javascript">
-        // ===== INDEXEDDB (for loading user-uploaded ROMs) =====
+        // ===== INDEXEDDB (for user-uploaded ROMs) =====
         const DB_NAME = 'kantasu_roms_db';
-        const DB_VERSION = 1;
         let db = null;
 
         function openDB() {
             return new Promise((resolve, reject) => {
-                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                const req = indexedDB.open(DB_NAME);
                 req.onupgradeneeded = (e) => {
                     const database = e.target.result;
-                    if (!database.objectStoreNames.contains('games')) {
-                        database.createObjectStore('games', { keyPath: 'id' });
-                    }
+                    if (!database.objectStoreNames.contains('games')) database.createObjectStore('games', { keyPath: 'id' });
                 };
                 req.onsuccess = (e) => { db = e.target.result; resolve(db); };
                 req.onerror = (e) => reject(e.target.error);
@@ -89,12 +63,57 @@
             });
         }
 
+        // ===== NUCLEAR CACHE CLEAR =====
+        // Delete ALL EmulatorJS-related databases to prevent version errors
+        function nukeCaches() {
+            return new Promise((resolve) => {
+                let pending = 0;
+                let done = 0;
+
+                function checkDone() {
+                    done++;
+                    if (done >= pending) resolve();
+                }
+
+                // List of known EmulatorJS database names to destroy
+                const dbsToDelete = [
+                    'EJS_roms', 'EJS_roms_v2', 'EJS_roms_v3',
+                    'EJS_states', 'EJS_save',
+                    '/data/saves', 'EJS_storage',
+                    'EJS_binary', 'EJS_cores'
+                ];
+
+                for (const dbName of dbsToDelete) {
+                    pending++;
+                    try {
+                        const req = indexedDB.deleteDatabase(dbName);
+                        req.onsuccess = checkDone;
+                        req.onerror = checkDone;
+                        req.onblocked = function() { setTimeout(checkDone, 100); };
+                    } catch(e) { checkDone(); }
+                }
+
+                // Also clear all localStorage keys that start with EJS_
+                try {
+                    const keys = Object.keys(localStorage);
+                    for (const key of keys) {
+                        if (key.startsWith('EJS_')) localStorage.removeItem(key);
+                    }
+                } catch(e) {}
+
+                // Clear sessionStorage too
+                try { sessionStorage.clear(); } catch(e) {}
+
+                if (pending === 0) resolve();
+            });
+        }
+
         // ===== MAIN LOADING LOGIC =====
         async function loadGame() {
             var params = new URLSearchParams(window.location.search);
             var romUrl = '';
             var gameName = '';
-            var userGameId = params.get('usergame'); // user game ID from IndexedDB
+            var userGameId = params.get('usergame');
 
             if (userGameId) {
                 // User-uploaded game - load ROM blob from IndexedDB
@@ -102,23 +121,20 @@
                     await openDB();
                     var gameRecord = await dbGet(userGameId);
                     if (gameRecord && gameRecord.romBlob) {
-                        // Create a fresh blob URL from the stored Blob
                         romUrl = URL.createObjectURL(gameRecord.romBlob);
                         gameName = gameRecord.title || 'Game';
-                        console.log('Loaded user game from IndexedDB:', gameName);
                     } else {
                         alert('Game not found in storage!');
                         window.location.href = 'index.html';
                         return;
                     }
                 } catch (err) {
-                    console.error('Error loading user game:', err);
                     alert('Error loading game: ' + err.message);
                     window.location.href = 'index.html';
                     return;
                 }
             } else {
-                // Built-in game - load from URL
+                // Built-in game
                 romUrl = params.get('rom') || '';
                 gameName = params.get('name') || 'Game';
                 if (romUrl && !romUrl.match(/^https?:\/\//)) {
@@ -128,51 +144,57 @@
 
             document.getElementById('game-name').textContent = gameName;
 
-            // Configure emulator
+            // NUKE all old caches BEFORE setting up the emulator
+            // This prevents the "version (1) less than existing version (N)" error
+            await nukeCaches();
+
+            // Configure emulator for MAXIMUM performance on low-end devices (4GB RAM)
             EJS_player = '#game';
             EJS_core = 'mupen64plus_next';
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
             EJS_pathtodata = 'data/';
+
+            // Auto-start
             EJS_startOnLoaded = true;
             EJS_volume = 1;
             EJS_AdUrl = '';
             EJS_color = '#9370db';
             EJS_disableAutoLang = true;
             EJS_language = 'en-US';
-            // Disable ROM caching to prevent version conflicts
-            // (user-uploaded ROMs change frequently, caching causes version errors)
+
+            // DISABLE all caching - prevents version errors
             EJS_CacheLimit = 0;
+            EJS_disableLocalStorage = true;
+
+            // MAXIMUM PERFORMANCE OPTIONS for 4GB RAM + low CPU
             EJS_defaultOptions = {
+                // Video plugin - GlideN64 is fastest with WebGL2
                 'mupen64plus-next-gfxplugin': 'GlideN64',
+                // Native N64 resolution - lowest possible for max FPS
                 'mupen64plus-next-screensize': '320x240',
+                // 4:3 aspect ratio
                 'mupen64plus-next-aspect': '4:3',
-                'mupen64plus-next-frame-skip': '2',
+                // Aggressive frame skip - skip up to 3 frames when behind
+                'mupen64plus-next-frame-skip': '3',
+                // Disable ALL visual effects that cost CPU
                 'mupen64plus-next-enable-fog': 'disabled',
-                'mupen64plus-next-enable-screenshot': 'disabled'
+                'mupen64plus-next-enable-screenshot': 'disabled',
+                // Disable texture filtering (nearest neighbor = fastest)
+                'mupen64plus-next-filtering': 'disabled',
+                // Disable depth buffer optimizations
+                'mupen64plus-next-enable-depth': 'disabled',
+                // Smaller audio buffer = less latency but might crackle
+                'mupen64plus-next-audio-buffer-size': '2048',
+                // Use HLE RSP (faster than LLE)
+                'mupen64plus-next-rsp-plugin': 'HLE',
+                // Disable texture cache
+                'mupen64plus-next-cache-textures': 'disabled'
             };
+
             EJS_debug = false;
 
-            // Clear any old cached version of this game to prevent version mismatch
-            try {
-                if (window.indexedDB) {
-                    var clearReq = indexedDB.deleteDatabase('EJS_roms');
-                    clearReq.onsuccess = function() { console.log('Cleared old ROM cache'); };
-                    clearReq.onerror = function() {};
-                    clearReq.onblocked = function() {};
-                }
-            } catch(e) {}
-
-            // Also clear localStorage cache keys
-            try {
-                Object.keys(localStorage).forEach(function(key) {
-                    if (key.startsWith('EJS_') && key.includes('rom')) {
-                        localStorage.removeItem(key);
-                    }
-                });
-            } catch(e) {}
-
-            // NOW load the emulator (after EJS vars are set)
+            // Load the emulator AFTER cache is cleared and options are set
             var script = document.createElement('script');
             script.src = 'data/loader.js';
             document.body.appendChild(script);
