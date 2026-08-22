@@ -20,8 +20,8 @@
             script.src = function() {
                 if ("undefined" != typeof EJS_paths && typeof EJS_paths[file] === "string") {
                     return EJS_paths[file];
-                } else if (file.endsWith("emulator.v2.min.js")) {
-                    return scriptPath + file;
+                } else if (file.endsWith("emulator.min.js")) {
+                    return scriptPath + file + "?v=2";
                 } else {
                     return scriptPath + "src/" + file;
                 }
@@ -42,7 +42,7 @@
                 if ("undefined" != typeof EJS_paths && typeof EJS_paths[file] === "string") {
                     return EJS_paths[file];
                 } else {
-                    return scriptPath + file;
+                    return scriptPath + file + "?v=2";
                 }
             }();
             css.onload = resolve;
@@ -59,7 +59,7 @@
         console[minifiedFailed ? "warn" : "error"]("Failed to load " + file + " beacuse it's likly that the minified files are missing.\nTo fix this you have 3 options:\n1. You can download the zip from the latest release here: https://github.com/EmulatorJS/EmulatorJS/releases/latest - Stable\n2. You can download the zip from here: https://cdn.emulatorjs.org/latest/data/emulator.min.zip and extract it to the data/ folder. (easiest option) - Beta\n3. You can build the files by running `npm i && npm run build` in the data/minify folder. (hardest option) - Beta\nNote: you will probably need to do the same for the cores, extract them to the data/cores/ folder.");
         if (minifiedFailed) {
             console.log("Attempting to load non-minified files");
-            if (file === "emulator.v2.min.js") {
+            if (file === "emulator.min.js") {
                 for (let i = 0; i < scripts.length; i++) {
                     await loadScript(scripts[i]);
                 }
@@ -75,8 +75,8 @@
         }
         await loadStyle("emulator.css");
     } else {
-        await loadScript("emulator.v2.min.js");
-        await loadStyle("emulator.v2.min.css");
+        await loadScript("emulator.min.js");
+        await loadStyle("emulator.min.css");
     }
     const config = {};
     config.gameUrl = window.EJS_gameUrl;
