@@ -140,7 +140,9 @@
             EJS_color = '#9370db';
             EJS_disableAutoLang = true;
             EJS_language = 'en-US';
-            EJS_CacheLimit = 524288000;
+            // Disable ROM caching to prevent version conflicts
+            // (user-uploaded ROMs change frequently, caching causes version errors)
+            EJS_CacheLimit = 0;
             EJS_defaultOptions = {
                 'mupen64plus-next-gfxplugin': 'GlideN64',
                 'mupen64plus-next-screensize': '320x240',
@@ -150,6 +152,25 @@
                 'mupen64plus-next-enable-screenshot': 'disabled'
             };
             EJS_debug = false;
+
+            // Clear any old cached version of this game to prevent version mismatch
+            try {
+                if (window.indexedDB) {
+                    var clearReq = indexedDB.deleteDatabase('EJS_roms');
+                    clearReq.onsuccess = function() { console.log('Cleared old ROM cache'); };
+                    clearReq.onerror = function() {};
+                    clearReq.onblocked = function() {};
+                }
+            } catch(e) {}
+
+            // Also clear localStorage cache keys
+            try {
+                Object.keys(localStorage).forEach(function(key) {
+                    if (key.startsWith('EJS_') && key.includes('rom')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+            } catch(e) {}
 
             // NOW load the emulator (after EJS vars are set)
             var script = document.createElement('script');

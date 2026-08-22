@@ -8,10 +8,10 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --bg-primary: #0d0d0d; --bg-secondary: #1a1a1a; --bg-card: #1e1e1e;
-            --accent: #9370db; --accent-hover: #b06fd3; --accent-glow: rgba(147,112,219,0.4);
-            --text-primary: #fff; --text-secondary: #8a8a8a; --text-dim: #555;
-            --border: #2a2a2a; --border-selected: #fff;
-            --green: #4caf50; --red: #f44336; --orange: #ff9800;
+            --bg-hover: #252525; --accent: #9370db; --accent-hover: #b06fd3;
+            --accent-glow: rgba(147,112,219,0.4); --text-primary: #ffffff;
+            --text-secondary: #8a8a8a; --text-dim: #555555; --border: #2a2a2a;
+            --border-selected: #ffffff; --red: #f44336;
         }
         html, body { height: 100%; overflow: hidden; }
         body {
@@ -33,17 +33,11 @@
         .nav { display: flex; gap: 24px; }
         .nav-item { font-size: 0.78rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-secondary); cursor: pointer; padding: 4px 0; border-bottom: 2px solid transparent; transition: color .2s, border-color .2s; user-select: none; }
         .nav-item:hover, .nav-item.active { color: var(--accent); border-bottom-color: var(--accent); }
-        .header-right { display: flex; align-items: center; gap: 12px; }
-        .username-display { font-size: 0.8rem; color: var(--accent); font-weight: 600; cursor: pointer; }
         .main { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 32px; position: relative; z-index: 1; }
         .main::-webkit-scrollbar { width: 8px; }
         .main::-webkit-scrollbar-track { background: rgba(26,26,26,.5); }
         .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         .main::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-        .toolbar { display: flex; gap: 12px; margin-bottom: 20px; max-width: 1400px; margin-left: auto; margin-right: auto; flex-wrap: wrap; }
-        .filter-btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); padding: 8px 16px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: 1px; }
-        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
-        .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
         .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
         .game-card { position: relative; aspect-ratio: 1/1; background: var(--bg-card); border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform .15s, box-shadow .15s; outline: none; border: 3px solid transparent; }
         .game-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
@@ -60,31 +54,6 @@
         .delete-btn { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.7); color: var(--red); border: 1px solid rgba(244,67,54,.5); border-radius: 4px; width: 24px; height: 24px; font-size: 0.8rem; cursor: pointer; display: none; align-items: center; justify-content: center; }
         .game-card:hover .delete-btn { display: flex; }
         .delete-btn:hover { background: rgba(244,67,54,.3); }
-        .vote-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.8); padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; }
-        .vote-bar .votes { display: flex; gap: 8px; align-items: center; }
-        .vote-bar .upvote { color: var(--green); cursor: pointer; }
-        .vote-bar .downvote { color: var(--red); cursor: pointer; }
-        .vote-bar .score { color: var(--text-primary); font-weight: 700; }
-        .vote-bar .downloads { color: var(--text-secondary); }
-        .upload-section { max-width: 600px; margin: 20px auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
-        .upload-section h2 { font-size: 1.1rem; margin-bottom: 8px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; }
-        .upload-section p { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 24px; }
-        .upload-form { display: flex; flex-direction: column; gap: 16px; }
-        .form-group { display: flex; flex-direction: column; gap: 6px; }
-        .form-group label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
-        .form-group input[type="text"], .form-group select { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; }
-        .form-group input[type="text"]:focus { border-color: var(--accent); }
-        .file-drop { border: 2px dashed var(--border); border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; }
-        .file-drop:hover { border-color: var(--accent); background: rgba(147,112,219,.05); }
-        .file-drop.dragover { border-color: var(--accent); background: rgba(147,112,219,.1); }
-        .file-drop .icon { font-size: 2.5rem; margin-bottom: 8px; display: block; }
-        .file-drop .text { font-size: 0.85rem; color: var(--text-secondary); }
-        .file-drop .filename { font-size: 0.85rem; color: var(--accent); margin-top: 8px; font-weight: 600; }
-        .btn { background: linear-gradient(135deg, var(--accent), #7b1fa2); color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: transform .15s, box-shadow .15s; }
-        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-secondary { background: var(--bg-card); border: 1px solid var(--border); }
-        .btn-secondary:hover { border-color: var(--accent); }
         .empty-state { text-align: center; padding: 80px 20px; color: var(--text-dim); }
         .empty-state .icon { font-size: 4rem; margin-bottom: 16px; }
         .footer { background: rgba(26,26,26,.85); backdrop-filter: blur(12px); border-top: 1px solid var(--border); padding: 10px 32px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-dim); flex-shrink: 0; position: relative; z-index: 100; }
@@ -93,16 +62,45 @@
         .key { display: inline-block; padding: 2px 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 1000; display: none; align-items: center; justify-content: center; }
-        .modal-overlay.active { display: flex; }
-        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; max-width: 400px; width: 90%; }
-        .modal h3 { color: var(--accent); margin-bottom: 16px; font-size: 1.1rem; }
-        .modal input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 16px; outline: none; }
-        .modal input:focus { border-color: var(--accent); }
-        .modal .error { color: var(--red); font-size: 0.8rem; margin-bottom: 12px; display: none; }
-        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
-        .update-banner { background: var(--orange); color: #000; padding: 12px 24px; text-align: center; font-size: 0.85rem; font-weight: 600; display: none; cursor: pointer; }
-        .update-banner.active { display: block; }
+
+        /* ===== UPLOAD SECTION ===== */
+        .panel { max-width: 600px; margin: 20px auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+        .panel-header { padding: 20px 24px; border-bottom: 1px solid var(--border); background: linear-gradient(135deg, rgba(147,112,219,.08), transparent); }
+        .panel-header h2 { font-size: 1rem; color: var(--text-primary); text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+        .panel-header p { color: var(--text-secondary); font-size: 0.8rem; margin-top: 4px; }
+        .panel-body { padding: 24px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-group label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .form-group input[type="text"], .form-group select {
+            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px;
+            padding: 12px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color .2s, box-shadow .2s;
+        }
+        .form-group input[type="text"]:focus, .form-group select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .file-drop { border: 2px dashed var(--border); border-radius: 8px; padding: 28px; text-align: center; cursor: pointer; transition: all .2s; position: relative; }
+        .file-drop:hover { border-color: var(--accent); background: rgba(147,112,219,.05); }
+        .file-drop.dragover { border-color: var(--accent); background: rgba(147,112,219,.1); }
+        .file-drop .drop-icon { width: 40px; height: 40px; margin: 0 auto 8px; opacity: 0.4; }
+        .file-drop .drop-icon svg { width: 100%; height: 100%; fill: var(--accent); }
+        .file-drop .text { font-size: 0.82rem; color: var(--text-secondary); }
+        .file-drop .filename { font-size: 0.82rem; color: var(--accent); margin-top: 8px; font-weight: 600; }
+        .btn { background: linear-gradient(135deg, var(--accent), #7b1fa2); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: transform .15s, box-shadow .15s; width: 100%; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* ===== MANAGE SECTION ===== */
+        .manage-list { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+        .manage-item { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; transition: border-color .2s, background .2s; }
+        .manage-item:hover { border-color: var(--accent); background: var(--bg-hover); }
+        .manage-item img { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); }
+        .manage-item .info { flex: 1; min-width: 0; }
+        .manage-item .info .name { font-size: 0.92rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .manage-item .info .meta { font-size: 0.72rem; color: var(--text-secondary); display: flex; gap: 12px; }
+        .manage-item .info .meta .tag { padding: 2px 8px; border-radius: 4px; background: rgba(147,112,219,.15); color: var(--accent); font-weight: 600; }
+        .manage-item .info .meta .tag.hack { background: rgba(243,156,18,.15); color: #f39c12; }
+        .btn-delete { background: transparent; border: 1px solid rgba(244,67,54,.4); color: var(--red); padding: 8px 16px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-delete:hover { background: rgba(244,67,54,.15); border-color: var(--red); }
+
         @media (max-width: 768px) {
             .header { padding: 0 16px; height: 50px; }
             .logo { font-size: 1.1rem; }
@@ -112,7 +110,9 @@
             .games-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
             .footer { padding: 8px 16px; }
             .footer .controls-hint { display: none; }
-            .upload-section { padding: 20px; margin: 10px; }
+            .panel { margin: 10px; }
+            .form-row { grid-template-columns: 1fr; }
+            .manage-item { flex-wrap: wrap; }
         }
         @media (max-width: 480px) { .games-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; } }
     </style>
@@ -120,96 +120,79 @@
 <body>
     <div class="bg-animation"><div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div></div>
 
-    <div class="update-banner" id="update-banner" onclick="handleUpdates()">
-        &#9888; Some community games have been updated. Click here to download the latest versions.
-    </div>
-
     <header class="header">
         <div class="header-left">
             <div class="logo">KANTASU<span>-</span>ROMS</div>
             <nav class="nav">
                 <div class="nav-item active" data-tab="og-roms" tabindex="0">Games</div>
                 <div class="nav-item" data-tab="rom-hacks" tabindex="0">Rom Hacks</div>
-                <div class="nav-item" data-tab="community" tabindex="0">Community</div>
                 <div class="nav-item" data-tab="your-games" tabindex="0">Your Games</div>
                 <div class="nav-item" data-tab="manage" tabindex="0">Manage</div>
             </nav>
         </div>
-        <div class="header-right">
-            <div class="username-display" id="username-display" onclick="showUsernameModal()">Set Username</div>
-        </div>
     </header>
 
     <main class="main">
-        <!-- OG ROMs -->
-        <div id="og-roms" class="tab-content active">
-            <div class="games-grid" id="og-grid"></div>
-        </div>
-        <!-- Rom Hacks -->
-        <div id="rom-hacks" class="tab-content">
-            <div class="games-grid" id="hacks-grid"></div>
-        </div>
-        <!-- Community -->
-        <div id="community" class="tab-content">
-            <div class="toolbar">
-                <button class="filter-btn active" data-filter="recent">Recent</button>
-                <button class="filter-btn" data-filter="downloads">Most Downloads</button>
-                <button class="filter-btn" data-filter="oldest">Oldest</button>
-                <button class="filter-btn" data-filter="liked">Most Liked</button>
-            </div>
-            <div class="games-grid" id="community-grid"></div>
-        </div>
-        <!-- Your Games -->
+        <div id="og-roms" class="tab-content active"><div class="games-grid" id="og-grid"></div></div>
+        <div id="rom-hacks" class="tab-content"><div class="games-grid" id="hacks-grid"></div></div>
         <div id="your-games" class="tab-content">
             <div class="games-grid" id="your-grid"></div>
-            <div class="upload-section">
-                <h2>&#43; Add Your Game</h2>
-                <p>Upload your own ROM file (zip, z64, or n64) with a custom icon. Games are stored locally in your browser using IndexedDB.</p>
-                <div class="upload-form">
-                    <div class="form-group"><label for="game-name-input">Game Name</label><input type="text" id="game-name-input" placeholder="e.g., Super Mario 64"></div>
-                    <div class="form-group"><label for="game-category">Category</label><select id="game-category"><option value="og-roms">Base Game</option><option value="rom-hacks">Rom Hack</option><option value="community">Community</option></select></div>
-                    <div class="form-group"><label>Game Icon (square image)</label><div class="file-drop" id="icon-drop"><span class="icon">&#128247;</span><span class="text">Click or drop an image here</span><span class="filename" id="icon-filename"></span><input type="file" id="icon-input" accept="image/*" style="display:none;"></div></div>
-                    <div class="form-group"><label>ROM File (zip, z64, or n64)</label><div class="file-drop" id="rom-drop"><span class="icon">&#128190;</span><span class="text">Click or drop a ROM file here</span><span class="filename" id="rom-filename"></span><input type="file" id="rom-input" accept=".zip,.z64,.n64,.v64" style="display:none;"></div></div>
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Add Your Game</h2>
+                    <p>Upload a ROM file (zip, z64, or n64) with a custom icon. Stored locally in your browser.</p>
+                </div>
+                <div class="panel-body">
+                    <div class="form-row">
+                        <div class="form-group"><label for="game-name-input">Game Name</label><input type="text" id="game-name-input" placeholder="Enter game name"></div>
+                        <div class="form-group"><label for="game-category">Category</label><select id="game-category"><option value="og-roms">Base Game</option><option value="rom-hacks">Rom Hack</option></select></div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:16px;">
+                        <label>Game Icon</label>
+                        <div class="file-drop" id="icon-drop">
+                            <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>
+                            <span class="text">Click or drop an image here</span>
+                            <span class="filename" id="icon-filename"></span>
+                            <input type="file" id="icon-input" accept="image/*" style="display:none;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:24px;">
+                        <label>ROM File</label>
+                        <div class="file-drop" id="rom-drop">
+                            <div class="drop-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+                            <span class="text">Click or drop a ROM file here (zip, z64, n64)</span>
+                            <span class="filename" id="rom-filename"></span>
+                            <input type="file" id="rom-input" accept=".zip,.z64,.n64,.v64" style="display:none;">
+                        </div>
+                    </div>
                     <button class="btn" id="add-game-btn" disabled>Add Game</button>
                 </div>
             </div>
         </div>
-        <!-- Manage (Delete) -->
         <div id="manage" class="tab-content">
-            <div class="upload-section" style="max-width:800px;">
-                <h2>&#128465; Manage Games</h2>
-                <p>Delete unwanted ROMs from your local storage or community library.</p>
-                <div id="manage-list"></div>
+            <div class="panel" style="max-width:800px;">
+                <div class="panel-header">
+                    <h2>Manage Games</h2>
+                    <p>Delete unwanted ROMs from your local storage.</p>
+                </div>
+                <div class="panel-body">
+                    <div class="manage-list" id="manage-list"></div>
+                </div>
             </div>
         </div>
     </main>
 
     <footer class="footer">
-        <div>Kantasu-Roms &mdash; For educational use only</div>
+        <div>Kantasu-Roms</div>
         <div class="controls-hint">
-            <span><span class="key">&#8592;&#8594;</span> Navigate</span>
+            <span><span class="key">Arrows</span> Navigate</span>
             <span><span class="key">Enter</span> Play</span>
-            <span><span class="key">Esc</span> Back</span>
         </div>
     </footer>
 
-    <!-- Username Modal -->
-    <div class="modal-overlay" id="username-modal">
-        <div class="modal">
-            <h3>Choose Your Username</h3>
-            <input type="text" id="username-input" placeholder="Enter a unique username" maxlength="20">
-            <div class="error" id="username-error">That username is already taken!</div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" onclick="closeUsernameModal()">Cancel</button>
-                <button class="btn" onclick="saveUsername()">Save</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        // ===== INDEXEDDB =====
         const DB_NAME = 'kantasu_roms_db';
-        const DB_VERSION = 2;
+        const DB_VERSION = 3;
         let db = null;
 
         function openDB() {
@@ -218,18 +201,16 @@
                 req.onupgradeneeded = (e) => {
                     const database = e.target.result;
                     if (!database.objectStoreNames.contains('games')) database.createObjectStore('games', { keyPath: 'id' });
-                    if (!database.objectStoreNames.contains('meta')) database.createObjectStore('meta', { keyPath: 'key' });
+                    if (database.objectStoreNames.contains('meta')) database.deleteObjectStore('meta');
                 };
                 req.onsuccess = (e) => { db = e.target.result; resolve(db); };
                 req.onerror = (e) => reject(e.target.error);
             });
         }
-        function dbAdd(store, item) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readwrite'); tx.objectStore(store).put(item); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
-        function dbGetAll(store) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readonly'); const req = tx.objectStore(store).getAll(); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
-        function dbGet(store, id) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readonly'); const req = tx.objectStore(store).get(id); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
-        function dbDelete(store, id) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readwrite'); tx.objectStore(store).delete(id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+        function dbAdd(item) { return new Promise((resolve, reject) => { const tx = db.transaction(['games'], 'readwrite'); tx.objectStore('games').put(item); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+        function dbGetAll() { return new Promise((resolve, reject) => { const tx = db.transaction(['games'], 'readonly'); const req = tx.objectStore('games').getAll(); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+        function dbDelete(id) { return new Promise((resolve, reject) => { const tx = db.transaction(['games'], 'readwrite'); tx.objectStore('games').delete(id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
 
-        // ===== DATA =====
         const builtinGames = {
             'og-roms': [
                 { id:'b1', title:'Super Mario 64', system:'Nintendo 64', rom:'roms/og-roms/super-mario-64.z64', cover:'icons/Super Mario 64.jpeg' },
@@ -240,24 +221,15 @@
             'rom-hacks': []
         };
 
-        let userGames = { 'og-roms': [], 'rom-hacks': [], 'community': [] };
-        let communityVotes = {}; // { gameId: { upvotes: 0, downvotes: 0, downloads: 0 } }
-        let username = localStorage.getItem('kantasu_username') || '';
-        let takenUsernames = JSON.parse(localStorage.getItem('kantasu_taken_usernames') || '[]');
-        let installedGameVersions = JSON.parse(localStorage.getItem('kantasu_installed_versions') || '{}');
-        let currentFilter = 'recent';
+        let userGames = { 'og-roms': [], 'rom-hacks': [] };
+        let selectedIndex = 0, cards = [], currentTab = 'og-roms';
 
         function getAllGames(tab) {
             if (tab === 'og-roms') return [...builtinGames['og-roms'], ...userGames['og-roms']];
             if (tab === 'rom-hacks') return [...builtinGames['rom-hacks'], ...userGames['rom-hacks']];
-            if (tab === 'community') return [...userGames['community']];
-            if (tab === 'your-games') return [...userGames['og-roms'], ...userGames['rom-hacks'], ...userGames['community']];
+            if (tab === 'your-games') return [...userGames['og-roms'], ...userGames['rom-hacks']];
             return [];
         }
-
-        let selectedIndex = 0;
-        let cards = [];
-        let currentTab = 'og-roms';
 
         function createGameCard(game, index) {
             const card = document.createElement('div');
@@ -265,24 +237,13 @@
             const badge = game.isUser ? '<div class="badge">Yours</div>' : '';
             const hackBadge = (currentTab === 'rom-hacks' && !game.isUser) ? '<div class="badge">Hack</div>' : '';
             const deleteBtn = game.isUser ? `<button class="delete-btn" data-id="${game.id}">&times;</button>` : '';
-            const cover = game.cover || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>&#127918;</text></svg>';
-
-            let voteBar = '';
-            if (currentTab === 'community') {
-                const v = communityVotes[game.id] || { upvotes: 0, downvotes: 0, downloads: 0 };
-                const score = v.upvotes - v.downvotes;
-                voteBar = `<div class="vote-bar"><div class="votes"><span class="upvote" onclick="vote('${game.id}',1)">&#9650;</span><span class="score">${score}</span><span class="downvote" onclick="vote('${game.id}',-1)">&#9660;</span></div><span class="downloads">&#11015; ${v.downloads}</span></div>`;
-            }
-
+            const cover = game.cover || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>Game</text></svg>';
             card.innerHTML = `${deleteBtn}${badge}${hackBadge}
                 <div class="game-cover"><img src="${cover}" alt="${game.title}" loading="lazy"></div>
                 <div class="play-hint">&#9654;</div>
-                <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>
-                ${voteBar}`;
-
+                <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>`;
             card.addEventListener('click', (e) => {
                 if (e.target.classList.contains('delete-btn')) { e.stopPropagation(); deleteUserGame(game.id); return; }
-                if (e.target.classList.contains('upvote') || e.target.classList.contains('downvote')) { e.stopPropagation(); return; }
                 playGame(game);
             });
             card.addEventListener('focus', () => selectCard(index));
@@ -290,22 +251,13 @@
         }
 
         function renderGames(tab) {
-            const gridId = tab === 'og-roms' ? 'og-grid' : tab === 'rom-hacks' ? 'hacks-grid' : tab === 'community' ? 'community-grid' : 'your-grid';
+            const gridId = tab === 'og-roms' ? 'og-grid' : tab === 'rom-hacks' ? 'hacks-grid' : 'your-grid';
             const grid = document.getElementById(gridId);
             if (!grid) return;
             grid.innerHTML = ''; cards = [];
-            let games = getAllGames(tab);
-
-            // Apply filters for community
-            if (tab === 'community') {
-                if (currentFilter === 'recent') games.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
-                else if (currentFilter === 'oldest') games.sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
-                else if (currentFilter === 'downloads') games.sort((a,b) => ((communityVotes[b.id]||{}).downloads||0) - ((communityVotes[a.id]||{}).downloads||0));
-                else if (currentFilter === 'liked') games.sort((a,b) => { const sa = ((communityVotes[a.id]||{}).upvotes||0) - ((communityVotes[a.id]||{}).downvotes||0); const sb = ((communityVotes[b.id]||{}).upvotes||0) - ((communityVotes[b.id]||{}).downvotes||0); return sb - sa; });
-            }
-
+            const games = getAllGames(tab);
             if (games.length === 0) {
-                if (tab !== 'your-games') grid.innerHTML = '<div class="empty-state"><div class="icon">&#127918;</div><div>No games here yet</div></div>';
+                if (tab !== 'your-games') grid.innerHTML = '<div class="empty-state"><div class="icon">No games here yet</div></div>';
                 return;
             }
             games.forEach((game, i) => { const card = createGameCard(game, i); grid.appendChild(card); cards.push(card); });
@@ -323,18 +275,6 @@
         }
 
         function playGame(game) {
-            // Increment download count for community games
-            if (currentTab === 'community' || game.category === 'community') {
-                if (!communityVotes[game.id]) communityVotes[game.id] = { upvotes: 0, downvotes: 0, downloads: 0 };
-                communityVotes[game.id].downloads++;
-                localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
-            }
-            // Track installed version for update notifications
-            if (game.id) {
-                installedGameVersions[game.id] = game.version || 1;
-                localStorage.setItem('kantasu_installed_versions', JSON.stringify(installedGameVersions));
-            }
-            // Navigate to player
             if (game.isUser || game.romBlob) {
                 window.location.href = `play.html?usergame=${encodeURIComponent(game.id)}`;
             } else {
@@ -342,7 +282,6 @@
             }
         }
 
-        // ===== TAB SWITCHING =====
         function switchTab(tabName) {
             currentTab = tabName;
             document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === tabName));
@@ -355,52 +294,6 @@
             item.addEventListener('keydown', (e) => { if (e.key === 'Enter') switchTab(item.dataset.tab); });
         });
 
-        // ===== FILTERS =====
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentFilter = btn.dataset.filter;
-                renderGames('community');
-            });
-        });
-
-        // ===== VOTING =====
-        window.vote = function(gameId, direction) {
-            if (!communityVotes[gameId]) communityVotes[gameId] = { upvotes: 0, downvotes: 0, downloads: 0 };
-            if (direction > 0) communityVotes[gameId].upvotes++;
-            else communityVotes[gameId].downvotes++;
-            localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
-            renderGames('community');
-        };
-
-        // ===== USERNAME =====
-        window.showUsernameModal = function() {
-            document.getElementById('username-input').value = username;
-            document.getElementById('username-error').style.display = 'none';
-            document.getElementById('username-modal').classList.add('active');
-            document.getElementById('username-input').focus();
-        };
-        window.closeUsernameModal = function() { document.getElementById('username-modal').classList.remove('active'); };
-        window.saveUsername = function() {
-            const newName = document.getElementById('username-input').value.trim();
-            if (!newName) return;
-            if (newName !== username && takenUsernames.includes(newName)) {
-                document.getElementById('username-error').style.display = 'block';
-                return;
-            }
-            // Remove old name from taken list, add new
-            if (username) takenUsernames = takenUsernames.filter(n => n !== username);
-            takenUsernames.push(newName);
-            localStorage.setItem('kantasu_taken_usernames', JSON.stringify(takenUsernames));
-            username = newName;
-            localStorage.setItem('kantasu_username', username);
-            document.getElementById('username-display').textContent = username;
-            closeUsernameModal();
-        };
-        if (username) document.getElementById('username-display').textContent = username;
-
-        // ===== KEYBOARD / GAMEPAD =====
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
             if (cards.length === 0) return;
@@ -415,6 +308,7 @@
                     break;
             }
         });
+
         let lastInputTime = 0;
         const INPUT_DELAY = 200;
         function pollGamepad() {
@@ -436,7 +330,6 @@
         }
         requestAnimationFrame(pollGamepad);
 
-        // ===== UPLOAD =====
         let iconFile = null, romFile = null;
         function setupFileDrop(dropId, inputId, filenameId, callback) {
             const drop = document.getElementById(dropId);
@@ -462,16 +355,12 @@
             const gameRecord = {
                 id: gameId, title: name, system: 'Nintendo 64', category: category,
                 cover: iconDataUrl, romBlob: romFile, isUser: true,
-                author: username || 'Anonymous', createdAt: Date.now(), version: 1
+                createdAt: Date.now()
             };
             try {
-                await dbAdd('games', gameRecord);
+                await dbAdd(gameRecord);
                 if (!userGames[category]) userGames[category] = [];
                 userGames[category].push({ ...gameRecord, romBlob: romFile });
-                if (category === 'community' && !communityVotes[gameId]) {
-                    communityVotes[gameId] = { upvotes: 0, downvotes: 0, downloads: 0 };
-                    localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
-                }
                 document.getElementById('game-name-input').value = '';
                 document.getElementById('icon-filename').textContent = '';
                 document.getElementById('rom-filename').textContent = '';
@@ -486,78 +375,47 @@
 
         async function deleteUserGame(id) {
             if (!confirm('Delete this game?')) return;
-            await dbDelete('games', id);
+            await dbDelete(id);
             for (const cat of Object.keys(userGames)) userGames[cat] = userGames[cat].filter(g => g.id !== id);
-            delete communityVotes[id];
-            localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
-            renderGames('your-games'); renderGames('og-roms'); renderGames('rom-hacks'); renderGames('community');
+            renderGames('your-games'); renderGames('og-roms'); renderGames('rom-hacks');
             renderManageList();
         }
 
-        // ===== MANAGE TAB =====
         function renderManageList() {
             const list = document.getElementById('manage-list');
             list.innerHTML = '';
-            const allUserGames = [...userGames['og-roms'], ...userGames['rom-hacks'], ...userGames['community']];
+            const allUserGames = [...userGames['og-roms'], ...userGames['rom-hacks']];
             if (allUserGames.length === 0) {
-                list.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px;">No user games to manage.</p>';
+                list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim);">No user games to manage.</div>';
                 return;
             }
             allUserGames.forEach(game => {
                 const item = document.createElement('div');
-                item.style.cssText = 'display:flex;align-items:center;gap:16px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;';
+                item.className = 'manage-item';
+                const isHack = game.category === 'rom-hacks';
                 item.innerHTML = `
-                    <img src="${game.cover || ''}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;">
-                    <div style="flex:1;">
-                        <div style="font-weight:600;">${game.title}</div>
-                        <div style="font-size:0.75rem;color:var(--text-secondary);">${game.category} &bull; by ${game.author || 'You'}</div>
+                    <img src="${game.cover || ''}" alt="${game.title}">
+                    <div class="info">
+                        <div class="name">${game.title}</div>
+                        <div class="meta">
+                            <span class="tag ${isHack ? 'hack' : ''}">${isHack ? 'Rom Hack' : 'Base Game'}</span>
+                            <span>${game.system || 'Nintendo 64'}</span>
+                        </div>
                     </div>
-                    <button class="btn btn-secondary" style="padding:6px 16px;font-size:0.78rem;" onclick="deleteUserGame('${game.id}')">Delete</button>
+                    <button class="btn-delete" onclick="deleteUserGame('${game.id}')">Delete</button>
                 `;
                 list.appendChild(item);
             });
         }
 
-        // ===== UPDATE NOTIFICATIONS =====
-        window.handleUpdates = function() {
-            const allCommunity = userGames['community'] || [];
-            const updates = allCommunity.filter(g => {
-                const installed = installedGameVersions[g.id] || 0;
-                return (g.version || 1) > installed;
-            });
-            if (updates.length === 0) {
-                document.getElementById('update-banner').classList.remove('active');
-                alert('All games are up to date!');
-                return;
-            }
-            if (confirm(`${updates.length} game(s) have updates. Download now?`)) {
-                updates.forEach(g => {
-                    installedGameVersions[g.id] = g.version || 1;
-                });
-                localStorage.setItem('kantasu_installed_versions', JSON.stringify(installedGameVersions));
-                document.getElementById('update-banner').classList.remove('active');
-                alert('Updates installed!');
-            }
-        };
-
-        function checkForUpdates() {
-            const allCommunity = userGames['community'] || [];
-            const hasUpdates = allCommunity.some(g => (g.version || 1) > (installedGameVersions[g.id] || 0));
-            if (hasUpdates) document.getElementById('update-banner').classList.add('active');
-        }
-
-        // ===== INIT =====
         async function init() {
             await openDB();
-            const stored = await dbGetAll('games');
+            const stored = await dbGetAll();
             for (const g of stored) {
                 if (!userGames[g.category]) userGames[g.category] = [];
                 userGames[g.category].push(g);
             }
-            // Load community votes
-            communityVotes = JSON.parse(localStorage.getItem('kantasu_community_votes') || '{}');
-            renderGames('og-roms'); renderGames('rom-hacks'); renderGames('your-games'); renderGames('community');
-            checkForUpdates();
+            renderGames('og-roms'); renderGames('rom-hacks'); renderGames('your-games');
         }
         init();
     </script>
