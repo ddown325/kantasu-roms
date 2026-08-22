@@ -7,152 +7,109 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
-            --bg-primary: #0d0d0d;
-            --bg-secondary: #1a1a1a;
-            --bg-card: #1e1e1e;
-            --accent: #9370db;
-            --accent-hover: #b06fd3;
-            --accent-glow: rgba(147, 112, 219, 0.4);
-            --text-primary: #ffffff;
-            --text-secondary: #8a8a8a;
-            --text-dim: #555555;
-            --border: #2a2a2a;
-            --border-selected: #ffffff;
+            --bg-primary: #0d0d0d; --bg-secondary: #1a1a1a; --bg-card: #1e1e1e;
+            --accent: #9370db; --accent-hover: #b06fd3; --accent-glow: rgba(147,112,219,0.4);
+            --text-primary: #fff; --text-secondary: #8a8a8a; --text-dim: #555;
+            --border: #2a2a2a; --border-selected: #fff;
+            --green: #4caf50; --red: #f44336; --orange: #ff9800;
         }
         html, body { height: 100%; overflow: hidden; }
         body {
-            background: var(--bg-primary);
-            font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-            color: var(--text-primary);
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            display: flex;
-            flex-direction: column;
-            position: relative;
+            background: var(--bg-primary); font-family: 'Segoe UI','Helvetica Neue',Arial,sans-serif;
+            color: var(--text-primary); -webkit-font-smoothing: antialiased;
+            display: flex; flex-direction: column; position: relative;
         }
         .bg-animation { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-        .bg-blob {
-            position: absolute; border-radius: 50%; filter: blur(80px);
-            opacity: 0.12; animation: float 20s infinite ease-in-out;
-        }
+        .bg-blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.12; animation: float 20s infinite ease-in-out; }
         .bg-blob:nth-child(1) { width: 600px; height: 600px; background: #8a2be2; top: -200px; left: -100px; }
         .bg-blob:nth-child(2) { width: 500px; height: 500px; background: #9370db; bottom: -150px; right: -100px; animation-delay: -5s; animation-duration: 25s; }
         .bg-blob:nth-child(3) { width: 400px; height: 400px; background: #6a0dad; top: 40%; left: 50%; animation-delay: -10s; animation-duration: 30s; }
         .bg-blob:nth-child(4) { width: 350px; height: 350px; background: #ba55d3; top: 20%; right: 20%; animation-delay: -15s; animation-duration: 22s; }
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(50px, -80px) scale(1.1); }
-            50% { transform: translate(-40px, 60px) scale(0.95); }
-            75% { transform: translate(80px, 30px) scale(1.05); }
-        }
-        .header {
-            background: rgba(26, 26, 26, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border); padding: 0 32px; height: 56px;
-            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; position: relative;
-        }
+        @keyframes float { 0%,100%{transform:translate(0,0) scale(1);} 25%{transform:translate(50px,-80px) scale(1.1);} 50%{transform:translate(-40px,60px) scale(.95);} 75%{transform:translate(80px,30px) scale(1.05);} }
+        .header { background: rgba(26,26,26,.85); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 0 32px; height: 56px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 100; position: relative; }
         .header-left { display: flex; align-items: center; gap: 32px; }
-        .logo { font-size: 1.3rem; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; color: var(--text-primary); }
+        .logo { font-size: 1.3rem; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
         .logo span { color: var(--accent); }
-        .nav { display: flex; gap: 28px; }
-        .nav-item {
-            font-size: 0.82rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase;
-            color: var(--text-secondary); cursor: pointer; padding: 4px 0;
-            border-bottom: 2px solid transparent; transition: color 0.2s, border-color 0.2s; user-select: none;
-        }
+        .nav { display: flex; gap: 24px; }
+        .nav-item { font-size: 0.78rem; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--text-secondary); cursor: pointer; padding: 4px 0; border-bottom: 2px solid transparent; transition: color .2s, border-color .2s; user-select: none; }
         .nav-item:hover, .nav-item.active { color: var(--accent); border-bottom-color: var(--accent); }
-        .nav-item:focus { outline: none; color: var(--accent); }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        .username-display { font-size: 0.8rem; color: var(--accent); font-weight: 600; cursor: pointer; }
         .main { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 24px 32px; position: relative; z-index: 1; }
         .main::-webkit-scrollbar { width: 8px; }
-        .main::-webkit-scrollbar-track { background: rgba(26,26,26,0.5); }
+        .main::-webkit-scrollbar-track { background: rgba(26,26,26,.5); }
         .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
         .main::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+        .toolbar { display: flex; gap: 12px; margin-bottom: 20px; max-width: 1400px; margin-left: auto; margin-right: auto; flex-wrap: wrap; }
+        .filter-btn { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary); padding: 8px 16px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: 1px; }
+        .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
         .games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; max-width: 1400px; margin: 0 auto; }
-        .game-card {
-            position: relative; aspect-ratio: 1 / 1; background: var(--bg-card); border-radius: 8px;
-            overflow: hidden; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;
-            outline: none; border: 3px solid transparent;
-        }
-        .game-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
-        .game-card.selected, .game-card:focus-visible {
-            border-color: var(--border-selected); box-shadow: 0 0 0 2px var(--bg-primary), 0 0 20px var(--accent-glow);
-        }
-        .game-card.selected { transform: scale(1.03); }
-        .game-cover { position: absolute; inset: 0; width: 100%; height: 100%; }
+        .game-card { position: relative; aspect-ratio: 1/1; background: var(--bg-card); border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform .15s, box-shadow .15s; outline: none; border: 3px solid transparent; }
+        .game-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+        .game-card.selected { border-color: var(--border-selected); box-shadow: 0 0 0 2px var(--bg-primary), 0 0 20px var(--accent-glow); transform: scale(1.03); }
+        .game-cover { position: absolute; inset: 0; }
         .game-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .game-overlay {
-            position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 60%);
-            display: flex; flex-direction: column; justify-content: flex-end; padding: 12px; opacity: 0; transition: opacity 0.2s ease;
-        }
+        .game-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.92) 0%, transparent 60%); display: flex; flex-direction: column; justify-content: flex-end; padding: 12px; opacity: 0; transition: opacity .2s; }
         .game-card:hover .game-overlay, .game-card.selected .game-overlay { opacity: 1; }
-        .game-title { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); line-height: 1.3; margin-bottom: 4px; }
+        .game-title { font-size: 0.88rem; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
         .game-system { font-size: 0.68rem; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
-        .play-hint {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-size: 2.5rem; opacity: 0; transition: opacity 0.2s ease; text-shadow: 0 2px 10px rgba(0,0,0,0.8); color: #fff;
-        }
-        .game-card:hover .play-hint, .game-card.selected .play-hint { opacity: 0.9; }
-        .badge {
-            position: absolute; top: 8px; right: 8px; background: rgba(243, 156, 18, 0.9); color: #000;
-            padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
-        }
-        .delete-btn {
-            position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); color: #ff4444;
-            border: 1px solid rgba(255,68,68,0.5); border-radius: 4px; width: 24px; height: 24px;
-            font-size: 0.8rem; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1;
-        }
+        .play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2.5rem; opacity: 0; transition: opacity .2s; text-shadow: 0 2px 10px rgba(0,0,0,.8); }
+        .game-card:hover .play-hint, .game-card.selected .play-hint { opacity: .9; }
+        .badge { position: absolute; top: 8px; right: 8px; background: rgba(243,156,18,.9); color: #000; padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+        .delete-btn { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.7); color: var(--red); border: 1px solid rgba(244,67,54,.5); border-radius: 4px; width: 24px; height: 24px; font-size: 0.8rem; cursor: pointer; display: none; align-items: center; justify-content: center; }
         .game-card:hover .delete-btn { display: flex; }
-        .delete-btn:hover { background: rgba(255,68,68,0.3); }
+        .delete-btn:hover { background: rgba(244,67,54,.3); }
+        .vote-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,.8); padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.72rem; }
+        .vote-bar .votes { display: flex; gap: 8px; align-items: center; }
+        .vote-bar .upvote { color: var(--green); cursor: pointer; }
+        .vote-bar .downvote { color: var(--red); cursor: pointer; }
+        .vote-bar .score { color: var(--text-primary); font-weight: 700; }
+        .vote-bar .downloads { color: var(--text-secondary); }
         .upload-section { max-width: 600px; margin: 20px auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
         .upload-section h2 { font-size: 1.1rem; margin-bottom: 8px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; }
         .upload-section p { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 24px; }
         .upload-form { display: flex; flex-direction: column; gap: 16px; }
         .form-group { display: flex; flex-direction: column; gap: 6px; }
         .form-group label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
-        .form-group input[type="text"] {
-            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px;
-            padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; transition: border-color 0.2s;
-        }
+        .form-group input[type="text"], .form-group select { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; }
         .form-group input[type="text"]:focus { border-color: var(--accent); }
-        .form-group select {
-            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px;
-            padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; outline: none; cursor: pointer;
-        }
-        .file-drop {
-            border: 2px dashed var(--border); border-radius: 8px; padding: 32px; text-align: center;
-            cursor: pointer; transition: border-color 0.2s, background 0.2s;
-        }
-        .file-drop:hover { border-color: var(--accent); background: rgba(147, 112, 219, 0.05); }
-        .file-drop.dragover { border-color: var(--accent); background: rgba(147, 112, 219, 0.1); }
+        .file-drop { border: 2px dashed var(--border); border-radius: 8px; padding: 32px; text-align: center; cursor: pointer; transition: all .2s; }
+        .file-drop:hover { border-color: var(--accent); background: rgba(147,112,219,.05); }
+        .file-drop.dragover { border-color: var(--accent); background: rgba(147,112,219,.1); }
         .file-drop .icon { font-size: 2.5rem; margin-bottom: 8px; display: block; }
         .file-drop .text { font-size: 0.85rem; color: var(--text-secondary); }
         .file-drop .filename { font-size: 0.85rem; color: var(--accent); margin-top: 8px; font-weight: 600; }
-        .btn-add {
-            background: linear-gradient(135deg, var(--accent), #7b1fa2); color: #fff; border: none;
-            padding: 12px 24px; border-radius: 6px; font-size: 0.9rem; font-weight: 700;
-            text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .btn-add:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
-        .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn { background: linear-gradient(135deg, var(--accent), #7b1fa2); color: #fff; border: none; padding: 12px 24px; border-radius: 6px; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; transition: transform .15s, box-shadow .15s; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: var(--bg-card); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--accent); }
         .empty-state { text-align: center; padding: 80px 20px; color: var(--text-dim); }
         .empty-state .icon { font-size: 4rem; margin-bottom: 16px; }
-        .footer {
-            background: rgba(26, 26, 26, 0.85); backdrop-filter: blur(12px); border-top: 1px solid var(--border);
-            padding: 10px 32px; display: flex; justify-content: space-between; align-items: center;
-            font-size: 0.75rem; color: var(--text-dim); flex-shrink: 0; position: relative; z-index: 100;
-        }
+        .footer { background: rgba(26,26,26,.85); backdrop-filter: blur(12px); border-top: 1px solid var(--border); padding: 10px 32px; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-dim); flex-shrink: 0; position: relative; z-index: 100; }
         .footer .controls-hint { display: flex; gap: 16px; }
         .footer .controls-hint span { display: flex; align-items: center; gap: 6px; }
         .key { display: inline-block; padding: 2px 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 3px; font-size: 0.7rem; color: var(--text-secondary); font-family: monospace; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 32px; max-width: 400px; width: 90%; }
+        .modal h3 { color: var(--accent); margin-bottom: 16px; font-size: 1.1rem; }
+        .modal input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 16px; outline: none; }
+        .modal input:focus { border-color: var(--accent); }
+        .modal .error { color: var(--red); font-size: 0.8rem; margin-bottom: 12px; display: none; }
+        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+        .update-banner { background: var(--orange); color: #000; padding: 12px 24px; text-align: center; font-size: 0.85rem; font-weight: 600; display: none; cursor: pointer; }
+        .update-banner.active { display: block; }
         @media (max-width: 768px) {
             .header { padding: 0 16px; height: 50px; }
             .logo { font-size: 1.1rem; }
-            .nav { gap: 16px; }
-            .nav-item { font-size: 0.72rem; letter-spacing: 1px; }
+            .nav { gap: 12px; }
+            .nav-item { font-size: 0.68rem; letter-spacing: 1px; }
             .main { padding: 16px; }
             .games-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
-            .game-title { font-size: 0.78rem; }
             .footer { padding: 8px 16px; }
             .footer .controls-hint { display: none; }
             .upload-section { padding: 20px; margin: 10px; }
@@ -161,62 +118,72 @@
     </style>
 </head>
 <body>
-    <div class="bg-animation">
-        <div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div>
+    <div class="bg-animation"><div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div><div class="bg-blob"></div></div>
+
+    <div class="update-banner" id="update-banner" onclick="handleUpdates()">
+        &#9888; Some community games have been updated. Click here to download the latest versions.
     </div>
+
     <header class="header">
         <div class="header-left">
             <div class="logo">KANTASU<span>-</span>ROMS</div>
-            <nav class="nav" role="navigation">
+            <nav class="nav">
                 <div class="nav-item active" data-tab="og-roms" tabindex="0">Games</div>
                 <div class="nav-item" data-tab="rom-hacks" tabindex="0">Rom Hacks</div>
+                <div class="nav-item" data-tab="community" tabindex="0">Community</div>
                 <div class="nav-item" data-tab="your-games" tabindex="0">Your Games</div>
+                <div class="nav-item" data-tab="manage" tabindex="0">Manage</div>
             </nav>
         </div>
+        <div class="header-right">
+            <div class="username-display" id="username-display" onclick="showUsernameModal()">Set Username</div>
+        </div>
     </header>
+
     <main class="main">
-        <div id="og-roms" class="tab-content active"><div class="games-grid" id="og-grid"></div></div>
-        <div id="rom-hacks" class="tab-content"><div class="games-grid" id="hacks-grid"></div></div>
+        <!-- OG ROMs -->
+        <div id="og-roms" class="tab-content active">
+            <div class="games-grid" id="og-grid"></div>
+        </div>
+        <!-- Rom Hacks -->
+        <div id="rom-hacks" class="tab-content">
+            <div class="games-grid" id="hacks-grid"></div>
+        </div>
+        <!-- Community -->
+        <div id="community" class="tab-content">
+            <div class="toolbar">
+                <button class="filter-btn active" data-filter="recent">Recent</button>
+                <button class="filter-btn" data-filter="downloads">Most Downloads</button>
+                <button class="filter-btn" data-filter="oldest">Oldest</button>
+                <button class="filter-btn" data-filter="liked">Most Liked</button>
+            </div>
+            <div class="games-grid" id="community-grid"></div>
+        </div>
+        <!-- Your Games -->
         <div id="your-games" class="tab-content">
             <div class="games-grid" id="your-grid"></div>
             <div class="upload-section">
                 <h2>&#43; Add Your Game</h2>
                 <p>Upload your own ROM file (zip, z64, or n64) with a custom icon. Games are stored locally in your browser using IndexedDB.</p>
                 <div class="upload-form">
-                    <div class="form-group">
-                        <label for="game-name-input">Game Name</label>
-                        <input type="text" id="game-name-input" placeholder="e.g., Super Mario 64">
-                    </div>
-                    <div class="form-group">
-                        <label for="game-category">Category</label>
-                        <select id="game-category">
-                            <option value="og-roms">Base Game</option>
-                            <option value="rom-hacks">Rom Hack</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Game Icon (square image recommended)</label>
-                        <div class="file-drop" id="icon-drop">
-                            <span class="icon">&#128247;</span>
-                            <span class="text">Click or drop an image here</span>
-                            <span class="filename" id="icon-filename"></span>
-                            <input type="file" id="icon-input" accept="image/*" style="display:none;">
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>ROM File (zip, z64, or n64)</label>
-                        <div class="file-drop" id="rom-drop">
-                            <span class="icon">&#128190;</span>
-                            <span class="text">Click or drop a ROM file here</span>
-                            <span class="filename" id="rom-filename"></span>
-                            <input type="file" id="rom-input" accept=".zip,.z64,.n64,.v64" style="display:none;">
-                        </div>
-                    </div>
-                    <button class="btn-add" id="add-game-btn" disabled>Add Game</button>
+                    <div class="form-group"><label for="game-name-input">Game Name</label><input type="text" id="game-name-input" placeholder="e.g., Super Mario 64"></div>
+                    <div class="form-group"><label for="game-category">Category</label><select id="game-category"><option value="og-roms">Base Game</option><option value="rom-hacks">Rom Hack</option><option value="community">Community</option></select></div>
+                    <div class="form-group"><label>Game Icon (square image)</label><div class="file-drop" id="icon-drop"><span class="icon">&#128247;</span><span class="text">Click or drop an image here</span><span class="filename" id="icon-filename"></span><input type="file" id="icon-input" accept="image/*" style="display:none;"></div></div>
+                    <div class="form-group"><label>ROM File (zip, z64, or n64)</label><div class="file-drop" id="rom-drop"><span class="icon">&#128190;</span><span class="text">Click or drop a ROM file here</span><span class="filename" id="rom-filename"></span><input type="file" id="rom-input" accept=".zip,.z64,.n64,.v64" style="display:none;"></div></div>
+                    <button class="btn" id="add-game-btn" disabled>Add Game</button>
                 </div>
             </div>
         </div>
+        <!-- Manage (Delete) -->
+        <div id="manage" class="tab-content">
+            <div class="upload-section" style="max-width:800px;">
+                <h2>&#128465; Manage Games</h2>
+                <p>Delete unwanted ROMs from your local storage or community library.</p>
+                <div id="manage-list"></div>
+            </div>
+        </div>
     </main>
+
     <footer class="footer">
         <div>Kantasu-Roms &mdash; For educational use only</div>
         <div class="controls-hint">
@@ -225,10 +192,24 @@
             <span><span class="key">Esc</span> Back</span>
         </div>
     </footer>
+
+    <!-- Username Modal -->
+    <div class="modal-overlay" id="username-modal">
+        <div class="modal">
+            <h3>Choose Your Username</h3>
+            <input type="text" id="username-input" placeholder="Enter a unique username" maxlength="20">
+            <div class="error" id="username-error">That username is already taken!</div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeUsernameModal()">Cancel</button>
+                <button class="btn" onclick="saveUsername()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // ===== INDEXEDDB STORAGE (handles large ROM files) =====
+        // ===== INDEXEDDB =====
         const DB_NAME = 'kantasu_roms_db';
-        const DB_VERSION = 1;
+        const DB_VERSION = 2;
         let db = null;
 
         function openDB() {
@@ -236,60 +217,41 @@
                 const req = indexedDB.open(DB_NAME, DB_VERSION);
                 req.onupgradeneeded = (e) => {
                     const database = e.target.result;
-                    if (!database.objectStoreNames.contains('games')) {
-                        database.createObjectStore('games', { keyPath: 'id' });
-                    }
+                    if (!database.objectStoreNames.contains('games')) database.createObjectStore('games', { keyPath: 'id' });
+                    if (!database.objectStoreNames.contains('meta')) database.createObjectStore('meta', { keyPath: 'key' });
                 };
                 req.onsuccess = (e) => { db = e.target.result; resolve(db); };
                 req.onerror = (e) => reject(e.target.error);
             });
         }
+        function dbAdd(store, item) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readwrite'); tx.objectStore(store).put(item); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
+        function dbGetAll(store) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readonly'); const req = tx.objectStore(store).getAll(); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+        function dbGet(store, id) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readonly'); const req = tx.objectStore(store).get(id); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); }); }
+        function dbDelete(store, id) { return new Promise((resolve, reject) => { const tx = db.transaction([store], 'readwrite'); tx.objectStore(store).delete(id); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); }
 
-        function dbAdd(game) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(['games'], 'readwrite');
-                tx.objectStore('games').add(game);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-        }
-
-        function dbGetAll() {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(['games'], 'readonly');
-                const req = tx.objectStore('games').getAll();
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-        }
-
-        function dbDelete(id) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(['games'], 'readwrite');
-                tx.objectStore('games').delete(id);
-                tx.oncomplete = () => resolve();
-                tx.onerror = () => reject(tx.error);
-            });
-        }
-
-        // ===== BUILT-IN GAMES =====
+        // ===== DATA =====
         const builtinGames = {
             'og-roms': [
-                { title: 'Super Mario 64', system: 'Nintendo 64', rom: 'roms/og-roms/super-mario-64.z64', cover: 'icons/Super Mario 64.jpeg' },
-                { title: "The Legend of Zelda: Ocarina of Time", system: 'Nintendo 64', rom: 'roms/og-roms/ocarina-of-time.z64', cover: 'icons/The Legend of Zelda - Ocarina of Time.jpeg' },
-                { title: "The Legend of Zelda: Majora's Mask", system: 'Nintendo 64', rom: 'roms/og-roms/majoras-mask.z64', cover: "icons/The Legend of Zelda - Majora's Mask.jpeg" },
-                { title: 'Banjo-Kazooie', system: 'Nintendo 64', rom: 'roms/og-roms/banjo-kazooie.n64', cover: 'icons/Banjo-Kazooie.jpeg' }
+                { id:'b1', title:'Super Mario 64', system:'Nintendo 64', rom:'roms/og-roms/super-mario-64.z64', cover:'icons/Super Mario 64.jpeg' },
+                { id:'b2', title:'The Legend of Zelda: Ocarina of Time', system:'Nintendo 64', rom:'roms/og-roms/ocarina-of-time.z64', cover:'icons/The Legend of Zelda - Ocarina of Time.jpeg' },
+                { id:'b3', title:"The Legend of Zelda: Majora's Mask", system:'Nintendo 64', rom:'roms/og-roms/majoras-mask.z64', cover:"icons/The Legend of Zelda - Majora's Mask.jpeg" },
+                { id:'b4', title:'Banjo-Kazooie', system:'Nintendo 64', rom:'roms/og-roms/banjo-kazooie.n64', cover:'icons/Banjo-Kazooie.jpeg' }
             ],
             'rom-hacks': []
         };
 
-        // ===== USER GAMES (loaded from IndexedDB) =====
-        let userGames = { 'og-roms': [], 'rom-hacks': [] };
+        let userGames = { 'og-roms': [], 'rom-hacks': [], 'community': [] };
+        let communityVotes = {}; // { gameId: { upvotes: 0, downvotes: 0, downloads: 0 } }
+        let username = localStorage.getItem('kantasu_username') || '';
+        let takenUsernames = JSON.parse(localStorage.getItem('kantasu_taken_usernames') || '[]');
+        let installedGameVersions = JSON.parse(localStorage.getItem('kantasu_installed_versions') || '{}');
+        let currentFilter = 'recent';
 
         function getAllGames(tab) {
             if (tab === 'og-roms') return [...builtinGames['og-roms'], ...userGames['og-roms']];
             if (tab === 'rom-hacks') return [...builtinGames['rom-hacks'], ...userGames['rom-hacks']];
-            if (tab === 'your-games') return [...userGames['og-roms'], ...userGames['rom-hacks']];
+            if (tab === 'community') return [...userGames['community']];
+            if (tab === 'your-games') return [...userGames['og-roms'], ...userGames['rom-hacks'], ...userGames['community']];
             return [];
         }
 
@@ -299,19 +261,28 @@
 
         function createGameCard(game, index) {
             const card = document.createElement('div');
-            card.className = 'game-card';
-            card.tabIndex = 0;
-            card.dataset.index = index;
+            card.className = 'game-card'; card.tabIndex = 0; card.dataset.index = index;
             const badge = game.isUser ? '<div class="badge">Yours</div>' : '';
             const hackBadge = (currentTab === 'rom-hacks' && !game.isUser) ? '<div class="badge">Hack</div>' : '';
             const deleteBtn = game.isUser ? `<button class="delete-btn" data-id="${game.id}">&times;</button>` : '';
             const cover = game.cover || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>&#127918;</text></svg>';
+
+            let voteBar = '';
+            if (currentTab === 'community') {
+                const v = communityVotes[game.id] || { upvotes: 0, downvotes: 0, downloads: 0 };
+                const score = v.upvotes - v.downvotes;
+                voteBar = `<div class="vote-bar"><div class="votes"><span class="upvote" onclick="vote('${game.id}',1)">&#9650;</span><span class="score">${score}</span><span class="downvote" onclick="vote('${game.id}',-1)">&#9660;</span></div><span class="downloads">&#11015; ${v.downloads}</span></div>`;
+            }
+
             card.innerHTML = `${deleteBtn}${badge}${hackBadge}
                 <div class="game-cover"><img src="${cover}" alt="${game.title}" loading="lazy"></div>
                 <div class="play-hint">&#9654;</div>
-                <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>`;
+                <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>
+                ${voteBar}`;
+
             card.addEventListener('click', (e) => {
                 if (e.target.classList.contains('delete-btn')) { e.stopPropagation(); deleteUserGame(game.id); return; }
+                if (e.target.classList.contains('upvote') || e.target.classList.contains('downvote')) { e.stopPropagation(); return; }
                 playGame(game);
             });
             card.addEventListener('focus', () => selectCard(index));
@@ -319,12 +290,20 @@
         }
 
         function renderGames(tab) {
-            const gridId = tab === 'og-roms' ? 'og-grid' : tab === 'rom-hacks' ? 'hacks-grid' : 'your-grid';
+            const gridId = tab === 'og-roms' ? 'og-grid' : tab === 'rom-hacks' ? 'hacks-grid' : tab === 'community' ? 'community-grid' : 'your-grid';
             const grid = document.getElementById(gridId);
             if (!grid) return;
-            grid.innerHTML = '';
-            cards = [];
-            const games = getAllGames(tab);
+            grid.innerHTML = ''; cards = [];
+            let games = getAllGames(tab);
+
+            // Apply filters for community
+            if (tab === 'community') {
+                if (currentFilter === 'recent') games.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+                else if (currentFilter === 'oldest') games.sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
+                else if (currentFilter === 'downloads') games.sort((a,b) => ((communityVotes[b.id]||{}).downloads||0) - ((communityVotes[a.id]||{}).downloads||0));
+                else if (currentFilter === 'liked') games.sort((a,b) => { const sa = ((communityVotes[a.id]||{}).upvotes||0) - ((communityVotes[a.id]||{}).downvotes||0); const sb = ((communityVotes[b.id]||{}).upvotes||0) - ((communityVotes[b.id]||{}).downvotes||0); return sb - sa; });
+            }
+
             if (games.length === 0) {
                 if (tab !== 'your-games') grid.innerHTML = '<div class="empty-state"><div class="icon">&#127918;</div><div>No games here yet</div></div>';
                 return;
@@ -344,14 +323,20 @@
         }
 
         function playGame(game) {
-            if (game.isUser) {
-                // For user games, create a blob URL from stored ROM data and redirect
-                const romBlob = game.romBlob;
-                const blobUrl = URL.createObjectURL(romBlob);
-                // Use session storage to pass the blob URL to play.html
-                sessionStorage.setItem('play_rom_url', blobUrl);
-                sessionStorage.setItem('play_rom_name', game.title);
-                window.location.href = 'play.html';
+            // Increment download count for community games
+            if (currentTab === 'community' || game.category === 'community') {
+                if (!communityVotes[game.id]) communityVotes[game.id] = { upvotes: 0, downvotes: 0, downloads: 0 };
+                communityVotes[game.id].downloads++;
+                localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
+            }
+            // Track installed version for update notifications
+            if (game.id) {
+                installedGameVersions[game.id] = game.version || 1;
+                localStorage.setItem('kantasu_installed_versions', JSON.stringify(installedGameVersions));
+            }
+            // Navigate to player
+            if (game.isUser || game.romBlob) {
+                window.location.href = `play.html?usergame=${encodeURIComponent(game.id)}`;
             } else {
                 window.location.href = `play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}`;
             }
@@ -363,13 +348,59 @@
             document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === tabName));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.id === tabName));
             renderGames(tabName);
+            if (tabName === 'manage') renderManageList();
         }
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', () => switchTab(item.dataset.tab));
             item.addEventListener('keydown', (e) => { if (e.key === 'Enter') switchTab(item.dataset.tab); });
         });
 
-        // ===== KEYBOARD NAVIGATION =====
+        // ===== FILTERS =====
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                renderGames('community');
+            });
+        });
+
+        // ===== VOTING =====
+        window.vote = function(gameId, direction) {
+            if (!communityVotes[gameId]) communityVotes[gameId] = { upvotes: 0, downvotes: 0, downloads: 0 };
+            if (direction > 0) communityVotes[gameId].upvotes++;
+            else communityVotes[gameId].downvotes++;
+            localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
+            renderGames('community');
+        };
+
+        // ===== USERNAME =====
+        window.showUsernameModal = function() {
+            document.getElementById('username-input').value = username;
+            document.getElementById('username-error').style.display = 'none';
+            document.getElementById('username-modal').classList.add('active');
+            document.getElementById('username-input').focus();
+        };
+        window.closeUsernameModal = function() { document.getElementById('username-modal').classList.remove('active'); };
+        window.saveUsername = function() {
+            const newName = document.getElementById('username-input').value.trim();
+            if (!newName) return;
+            if (newName !== username && takenUsernames.includes(newName)) {
+                document.getElementById('username-error').style.display = 'block';
+                return;
+            }
+            // Remove old name from taken list, add new
+            if (username) takenUsernames = takenUsernames.filter(n => n !== username);
+            takenUsernames.push(newName);
+            localStorage.setItem('kantasu_taken_usernames', JSON.stringify(takenUsernames));
+            username = newName;
+            localStorage.setItem('kantasu_username', username);
+            document.getElementById('username-display').textContent = username;
+            closeUsernameModal();
+        };
+        if (username) document.getElementById('username-display').textContent = username;
+
+        // ===== KEYBOARD / GAMEPAD =====
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
             if (cards.length === 0) return;
@@ -384,8 +415,6 @@
                     break;
             }
         });
-
-        // ===== GAMEPAD SUPPORT =====
         let lastInputTime = 0;
         const INPUT_DELAY = 200;
         function pollGamepad() {
@@ -394,16 +423,12 @@
                 if (!pad) continue;
                 const now = Date.now();
                 if (now - lastInputTime < INPUT_DELAY) break;
-                const deadzone = 0.5;
-                const up = pad.buttons[12]?.pressed || pad.axes[1] < -deadzone;
-                const down = pad.buttons[13]?.pressed || pad.axes[1] > deadzone;
-                const left = pad.buttons[14]?.pressed || pad.axes[0] < -deadzone;
-                const right = pad.buttons[15]?.pressed || pad.axes[0] > deadzone;
+                const dz = 0.5;
                 const cols = Math.max(1, Math.floor(document.querySelector('.games-grid')?.offsetWidth / 200 || 1));
-                if (up) { selectCard(selectedIndex - cols); lastInputTime = now; }
-                if (down) { selectCard(selectedIndex + cols); lastInputTime = now; }
-                if (left) { selectCard(selectedIndex - 1); lastInputTime = now; }
-                if (right) { selectCard(selectedIndex + 1); lastInputTime = now; }
+                if (pad.buttons[12]?.pressed || pad.axes[1] < -dz) { selectCard(selectedIndex - cols); lastInputTime = now; }
+                if (pad.buttons[13]?.pressed || pad.axes[1] > dz) { selectCard(selectedIndex + cols); lastInputTime = now; }
+                if (pad.buttons[14]?.pressed || pad.axes[0] < -dz) { selectCard(selectedIndex - 1); lastInputTime = now; }
+                if (pad.buttons[15]?.pressed || pad.axes[0] > dz) { selectCard(selectedIndex + 1); lastInputTime = now; }
                 if (pad.buttons[0]?.pressed && cards.length > 0) { playGame(getAllGames(currentTab)[selectedIndex]); lastInputTime = now; }
                 break;
             }
@@ -411,62 +436,42 @@
         }
         requestAnimationFrame(pollGamepad);
 
-        // ===== UPLOAD FUNCTIONALITY =====
-        let iconFile = null;
-        let romFile = null;
-
+        // ===== UPLOAD =====
+        let iconFile = null, romFile = null;
         function setupFileDrop(dropId, inputId, filenameId, callback) {
             const drop = document.getElementById(dropId);
             const input = document.getElementById(inputId);
-            const filenameLabel = document.getElementById(filenameId);
+            const fnLabel = document.getElementById(filenameId);
             drop.addEventListener('click', () => input.click());
             drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
             drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-            drop.addEventListener('drop', (e) => {
-                e.preventDefault(); drop.classList.remove('dragover');
-                if (e.dataTransfer.files.length > 0) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change')); }
-            });
-            input.addEventListener('change', () => {
-                if (input.files.length > 0) { filenameLabel.textContent = input.files[0].name; callback(input.files[0]); checkAddButton(); }
-            });
+            drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('dragover'); if (e.dataTransfer.files.length > 0) { input.files = e.dataTransfer.files; input.dispatchEvent(new Event('change')); } });
+            input.addEventListener('change', () => { if (input.files.length > 0) { fnLabel.textContent = input.files[0].name; callback(input.files[0]); checkAddButton(); } });
         }
-
         setupFileDrop('icon-drop', 'icon-input', 'icon-filename', (file) => { iconFile = file; });
         setupFileDrop('rom-drop', 'rom-input', 'rom-filename', (file) => { romFile = file; });
-
-        function checkAddButton() {
-            const name = document.getElementById('game-name-input').value.trim();
-            document.getElementById('add-game-btn').disabled = !(name && iconFile && romFile);
-        }
+        function checkAddButton() { const name = document.getElementById('game-name-input').value.trim(); document.getElementById('add-game-btn').disabled = !(name && iconFile && romFile); }
         document.getElementById('game-name-input').addEventListener('input', checkAddButton);
 
         document.getElementById('add-game-btn').addEventListener('click', async () => {
             const name = document.getElementById('game-name-input').value.trim();
             const category = document.getElementById('game-category').value;
             if (!name || !iconFile || !romFile) return;
-
-            // Read icon as data URL (small, safe for localStorage)
-            const iconDataUrl = await new Promise(resolve => {
-                const r = new FileReader(); r.onload = e => resolve(e.target.result); r.readAsDataURL(iconFile);
-            });
-
-            // Store ROM as Blob in IndexedDB (handles large files)
+            const iconDataUrl = await new Promise(resolve => { const r = new FileReader(); r.onload = e => resolve(e.target.result); r.readAsDataURL(iconFile); });
             const gameId = 'game_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             const gameRecord = {
-                id: gameId,
-                title: name,
-                system: 'Nintendo 64',
-                category: category,
-                cover: iconDataUrl,
-                romBlob: romFile,  // Store as Blob directly
-                isUser: true
+                id: gameId, title: name, system: 'Nintendo 64', category: category,
+                cover: iconDataUrl, romBlob: romFile, isUser: true,
+                author: username || 'Anonymous', createdAt: Date.now(), version: 1
             };
-
             try {
-                await dbAdd(gameRecord);
-                // Also keep in memory for current session
+                await dbAdd('games', gameRecord);
+                if (!userGames[category]) userGames[category] = [];
                 userGames[category].push({ ...gameRecord, romBlob: romFile });
-                // Clear form
+                if (category === 'community' && !communityVotes[gameId]) {
+                    communityVotes[gameId] = { upvotes: 0, downvotes: 0, downloads: 0 };
+                    localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
+                }
                 document.getElementById('game-name-input').value = '';
                 document.getElementById('icon-filename').textContent = '';
                 document.getElementById('rom-filename').textContent = '';
@@ -476,32 +481,83 @@
                 checkAddButton();
                 renderGames('your-games'); renderGames(category);
                 alert('Game added successfully!');
-            } catch (err) {
-                alert('Error saving game: ' + err.message);
-            }
+            } catch (err) { alert('Error saving game: ' + err.message); }
         });
 
         async function deleteUserGame(id) {
             if (!confirm('Delete this game?')) return;
-            await dbDelete(id);
-            for (const cat of ['og-roms', 'rom-hacks']) {
-                userGames[cat] = userGames[cat].filter(g => g.id !== id);
+            await dbDelete('games', id);
+            for (const cat of Object.keys(userGames)) userGames[cat] = userGames[cat].filter(g => g.id !== id);
+            delete communityVotes[id];
+            localStorage.setItem('kantasu_community_votes', JSON.stringify(communityVotes));
+            renderGames('your-games'); renderGames('og-roms'); renderGames('rom-hacks'); renderGames('community');
+            renderManageList();
+        }
+
+        // ===== MANAGE TAB =====
+        function renderManageList() {
+            const list = document.getElementById('manage-list');
+            list.innerHTML = '';
+            const allUserGames = [...userGames['og-roms'], ...userGames['rom-hacks'], ...userGames['community']];
+            if (allUserGames.length === 0) {
+                list.innerHTML = '<p style="color:var(--text-dim);text-align:center;padding:40px;">No user games to manage.</p>';
+                return;
             }
-            renderGames('your-games'); renderGames('og-roms'); renderGames('rom-hacks');
+            allUserGames.forEach(game => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display:flex;align-items:center;gap:16px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;';
+                item.innerHTML = `
+                    <img src="${game.cover || ''}" style="width:48px;height:48px;border-radius:6px;object-fit:cover;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">${game.title}</div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary);">${game.category} &bull; by ${game.author || 'You'}</div>
+                    </div>
+                    <button class="btn btn-secondary" style="padding:6px 16px;font-size:0.78rem;" onclick="deleteUserGame('${game.id}')">Delete</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // ===== UPDATE NOTIFICATIONS =====
+        window.handleUpdates = function() {
+            const allCommunity = userGames['community'] || [];
+            const updates = allCommunity.filter(g => {
+                const installed = installedGameVersions[g.id] || 0;
+                return (g.version || 1) > installed;
+            });
+            if (updates.length === 0) {
+                document.getElementById('update-banner').classList.remove('active');
+                alert('All games are up to date!');
+                return;
+            }
+            if (confirm(`${updates.length} game(s) have updates. Download now?`)) {
+                updates.forEach(g => {
+                    installedGameVersions[g.id] = g.version || 1;
+                });
+                localStorage.setItem('kantasu_installed_versions', JSON.stringify(installedGameVersions));
+                document.getElementById('update-banner').classList.remove('active');
+                alert('Updates installed!');
+            }
+        };
+
+        function checkForUpdates() {
+            const allCommunity = userGames['community'] || [];
+            const hasUpdates = allCommunity.some(g => (g.version || 1) > (installedGameVersions[g.id] || 0));
+            if (hasUpdates) document.getElementById('update-banner').classList.add('active');
         }
 
         // ===== INIT =====
         async function init() {
             await openDB();
-            // Load user games from IndexedDB
-            const stored = await dbGetAll();
+            const stored = await dbGetAll('games');
             for (const g of stored) {
                 if (!userGames[g.category]) userGames[g.category] = [];
                 userGames[g.category].push(g);
             }
-            renderGames('og-roms');
-            renderGames('rom-hacks');
-            renderGames('your-games');
+            // Load community votes
+            communityVotes = JSON.parse(localStorage.getItem('kantasu_community_votes') || '{}');
+            renderGames('og-roms'); renderGames('rom-hacks'); renderGames('your-games'); renderGames('community');
+            checkForUpdates();
         }
         init();
     </script>
