@@ -230,16 +230,11 @@
     </div>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('og-roms')">OG Roms</button>
-        <button class="tab-btn" onclick="switchTab('rom-hacks')">Rom Hacks</button>
+        <button class="tab-btn active" onclick="switchTab('og-roms', event)">OG Roms</button>
     </div>
 
     <div id="og-roms" class="tab-content active">
         <div class="games-grid" id="og-grid"></div>
-    </div>
-
-    <div id="rom-hacks" class="tab-content">
-        <div class="games-grid" id="hack-grid"></div>
     </div>
 
     <div class="footer">
@@ -272,16 +267,6 @@
                     system: 'Nintendo 64',
                     rom: 'roms/og-roms/banjo-kazooie.n64',
                     cover: 'https://upload.wikimedia.org/wikipedia/en/7/7e/Banjo-Kazooie_box_art.jpg'
-                }
-            ],
-            'rom-hacks': [
-                {
-                    title: 'Super Mario 64 (Kantasu Edition)',
-                    system: 'Nintendo 64 - ROM Hack',
-                    rom: 'roms/rom-hacks/super-mario-64-patched.z64',
-                    cover: 'https://upload.wikimedia.org/wikipedia/en/6/6a/Super_Mario_64_box_cover.jpg',
-                    badge: 'HACK',
-                    badgeClass: 'badge-hack'
                 }
             ]
         };
@@ -319,7 +304,7 @@
             });
         }
 
-        function switchTab(tabName) {
+        function switchTab(tabName, event) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
@@ -328,7 +313,6 @@
         }
 
         renderGames('og-roms');
-        renderGames('rom-hacks');
     </script>
 </body>
 </html>

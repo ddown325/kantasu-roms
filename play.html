@@ -5,12 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kantasu-Roms - Player</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #1a0a2e;
             min-height: 100vh;
@@ -20,7 +15,6 @@
             flex-direction: column;
             align-items: center;
         }
-
         .nav {
             background: linear-gradient(90deg, #6a0dad 0%, #8a2be2 50%, #9370db 100%);
             width: 100%;
@@ -30,52 +24,31 @@
             justify-content: space-between;
             box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
         }
-
-        .nav a {
-            color: #fff;
-            text-decoration: none;
-            font-size: 1.2rem;
-            font-weight: 600;
-        }
-
-        .nav .game-name {
-            color: #e6e6fa;
-            font-size: 1.1rem;
-        }
-
-        #game-container {
-            width: 100%;
-            max-width: 900px;
-            margin: 20px auto;
-            padding: 0 15px;
-        }
-
-        #game {
-            width: 100%;
-            height: 600px;
-            max-height: 80vh;
-        }
-
-        @media (max-width: 600px) {
-            #game { height: 400px; }
-            .nav .game-name { font-size: 0.9rem; }
-        }
+        .nav a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 600; }
+        .nav .game-name { color: #e6e6fa; font-size: 1.1rem; }
+        #game-container { width: 100%; max-width: 900px; margin: 20px auto; padding: 0 15px; }
+        #game { width: 100%; height: 600px; max-height: 80vh; }
+        @media (max-width: 600px) { #game { height: 400px; } .nav .game-name { font-size: 0.9rem; } }
     </style>
 </head>
 <body>
     <div class="nav">
-        <a href="index.html">← Kantasu-Roms</a>
+        <a href="index.html">&larr; Kantasu-Roms</a>
         <div class="game-name" id="game-name">Loading...</div>
     </div>
-
     <div id="game-container">
         <div id="game"></div>
     </div>
-
     <script type="text/javascript">
-        const params = new URLSearchParams(window.location.search);
-        const romUrl = params.get('rom') || '';
-        const gameName = params.get('name') || 'Game';
+        var params = new URLSearchParams(window.location.search);
+        var romUrl = params.get('rom') || '';
+        var gameName = params.get('name') || 'Game';
+
+        // Convert relative ROM URL to absolute URL based on current page location
+        // This ensures the emulator can fetch the ROM regardless of site path
+        if (romUrl && !romUrl.match(/^https?:\/\//)) {
+            romUrl = new URL(romUrl, window.location.href).href;
+        }
 
         document.getElementById('game-name').textContent = gameName;
 
@@ -88,6 +61,7 @@
         EJS_volume = 1;
         EJS_AdUrl = '';
         EJS_color = '#8a2be2';
+        EJS_debug = true;
     </script>
     <script src="data/loader.js"></script>
 </body>
