@@ -44,8 +44,7 @@
         var romUrl = params.get('rom') || '';
         var gameName = params.get('name') || 'Game';
 
-        // Convert relative ROM URL to absolute URL based on current page location
-        // This ensures the emulator can fetch the ROM regardless of site path
+        // Convert relative ROM URL to absolute URL
         if (romUrl && !romUrl.match(/^https?:\/\//)) {
             romUrl = new URL(romUrl, window.location.href).href;
         }
@@ -61,7 +60,8 @@
         EJS_volume = 1;
         EJS_AdUrl = '';
         EJS_color = '#8a2be2';
-        EJS_debug = true;
+        EJS_disableAutoLang = true;
+        EJS_language = 'en-US';
     </script>
     <script src="data/loader.js"></script>
 </body>
