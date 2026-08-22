@@ -312,12 +312,15 @@
         document.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
             if (cards.length === 0) return;
-            // Calculate columns properly based on actual grid layout
-            const grid = document.querySelector('.games-grid');
+            // Get the ACTIVE (visible) grid, not just any grid
+            const activeContent = document.querySelector('.tab-content.active');
+            if (!activeContent) return;
+            const grid = activeContent.querySelector('.games-grid');
             if (!grid) return;
-            const gridStyle = window.getComputedStyle(grid);
-            const gridWidth = grid.clientWidth - parseInt(gridStyle.paddingLeft) - parseInt(gridStyle.paddingRight);
-            const gap = parseInt(gridStyle.gap) || 20;
+            // Calculate columns by counting how many cards fit in the grid width
+            const gridRect = grid.getBoundingClientRect();
+            const gridWidth = gridRect.width;
+            const gap = 20; // matches CSS gap
             const cardMinWidth = 180; // matches CSS minmax(180px, 1fr)
             const cols = Math.max(1, Math.floor((gridWidth + gap) / (cardMinWidth + gap)));
             switch(e.key) {
@@ -340,10 +343,10 @@
                 const now = Date.now();
                 if (now - lastInputTime < INPUT_DELAY) break;
                 const dz = 0.5;
-                const grid = document.querySelector('.games-grid');
-                const gridStyle = grid ? window.getComputedStyle(grid) : null;
-                const gridWidth = grid ? grid.clientWidth - parseInt(gridStyle.paddingLeft) - parseInt(gridStyle.paddingRight) : 0;
-                const gap = gridStyle ? (parseInt(gridStyle.gap) || 20) : 20;
+                const activeContent = document.querySelector('.tab-content.active');
+                const grid = activeContent ? activeContent.querySelector('.games-grid') : null;
+                const gridWidth = grid ? grid.getBoundingClientRect().width : 0;
+                const gap = 20;
                 const cols = Math.max(1, Math.floor((gridWidth + gap) / (180 + gap)));
                 if (pad.buttons[12]?.pressed || pad.axes[1] < -dz) { selectCard(selectedIndex - cols); lastInputTime = now; }
                 if (pad.buttons[13]?.pressed || pad.axes[1] > dz) { selectCard(selectedIndex + cols); lastInputTime = now; }
