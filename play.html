@@ -63,56 +63,23 @@
             });
         }
 
-        // ===== NUCLEAR CACHE CLEAR =====
-        // Delete ALL EmulatorJS-related databases to prevent version errors
+        // ===== CACHE CLEAR =====
         function nukeCaches() {
             return new Promise((resolve) => {
-                let pending = 0;
-                let done = 0;
-
-                function checkDone() {
-                    done++;
-                    if (done >= pending) resolve();
-                }
-
-                // List of known EmulatorJS database names to destroy
                 const dbsToDelete = [
-                    'EmulatorJS-roms', 'EmulatorJS-bios', 'EmulatorJS-core', 'EmulatorJS-states',
-                    'EJS_roms', 'EJS_roms_v2', 'EJS_roms_v3',
-                    'EJS_states', 'EJS_save', 'EJS_storage',
-                    'EJS_binary', 'EJS_cores'
+                    'EmulatorJS-roms', 'EmulatorJS-bios', 'EmulatorJS-core', 'EmulatorJS-states'
                 ];
-
+                let pending = dbsToDelete.length;
+                if (pending === 0) { resolve(); return; }
                 for (const dbName of dbsToDelete) {
-                    pending++;
                     try {
                         const req = indexedDB.deleteDatabase(dbName);
-                        req.onsuccess = checkDone;
-                        req.onerror = checkDone;
-                        req.onblocked = function() {
-                            // If blocked, force-resolve after 500ms
-                            setTimeout(checkDone, 500);
-                        };
-                    } catch(e) { checkDone(); }
+                        req.onsuccess = () => { if (--pending === 0) resolve(); };
+                        req.onerror = () => { if (--pending === 0) resolve(); };
+                        req.onblocked = () => { setTimeout(() => { if (--pending === 0) resolve(); }, 500); };
+                    } catch(e) { if (--pending === 0) resolve(); }
                 }
-
-                // Safety timeout: resolve after 2 seconds no matter what
                 setTimeout(resolve, 2000);
-
-                if (pending === 0) resolve();
-
-                // Also clear all localStorage keys that start with EJS_
-                try {
-                    const keys = Object.keys(localStorage);
-                    for (const key of keys) {
-                        if (key.startsWith('EJS_')) localStorage.removeItem(key);
-                    }
-                } catch(e) {}
-
-                // Clear sessionStorage too
-                try { sessionStorage.clear(); } catch(e) {}
-
-                if (pending === 0) resolve();
             });
         }
 
@@ -124,7 +91,6 @@
             var userGameId = params.get('usergame');
 
             if (userGameId) {
-                // User-uploaded game - load ROM blob from IndexedDB
                 try {
                     await openDB();
                     var gameRecord = await dbGet(userGameId);
@@ -136,8 +102,6 @@
                         window.location.href = 'index.html';
                         return;
                     }
-                    // CLOSE our database connection before nuking other DBs
-                    // This prevents "blocked" state on deleteDatabase
                     db.close();
                 } catch (err) {
                     alert('Error loading game: ' + err.message);
@@ -145,7 +109,6 @@
                     return;
                 }
             } else {
-                // Built-in game
                 romUrl = params.get('rom') || '';
                 gameName = params.get('name') || 'Game';
                 if (romUrl && !romUrl.match(/^https?:\/\//)) {
@@ -155,18 +118,104 @@
 
             document.getElementById('game-name').textContent = gameName;
 
-            // NUKE all old caches BEFORE setting up the emulator
-            // This prevents the "version (1) less than existing version (N)" error
+            // Clear old caches
             await nukeCaches();
 
-            // Configure emulator for MAXIMUM performance on low-end devices (4GB RAM)
+            // Determine game type for custom controls
+            var gameLower = gameName.toLowerCase();
+            var isSM64 = gameLower.includes('mario 64') || gameLower.includes('sm64') || gameLower.includes('super mario');
+            var isBanjo = gameLower.includes('banjo');
+            var isZelda = gameLower.includes('zelda') || gameLower.includes('ocarina') || gameLower.includes('majora');
+
+            // ===== DEFAULT CONTROLLER MAPPINGS =====
+            // Format: EJS_defaultControls[playerNum] = { 0: { code: keycode, name: 'key name' }, ... }
+            // Button IDs: 0=A, 1=B, 2=Select, 3=Start, 4=Up, 5=Down, 6=Left, 7=Right,
+            //             8=A(2), 9=B(2), 10=L, 11=R, 12=C-Up, 13=C-Down, 14=C-Left, 15=C-Right
+
+            if (isSM64) {
+                // SM64 Controls:
+                // A Button (Jump): C
+                // B Button (Punch/Attack): X
+                // Z Trigger (Crouch/Ground Pound): Z
+                // Movement: WASD
+                // Camera (C-Buttons): IJKL
+                // Start: Enter
+                EJS_defaultControls = {
+                    0: {
+                        0: { code: 'KeyC', name: 'C' },           // A = C (Jump)
+                        1: { code: 'KeyX', name: 'X' },           // B = X (Punch/Attack)
+                        2: { code: 'KeyZ', name: 'Z' },           // Z = Z (Crouch/Ground Pound)
+                        3: { code: 'Enter', name: 'Enter' },      // Start
+                        4: { code: 'KeyW', name: 'W' },           // Up
+                        5: { code: 'KeyS', name: 'S' },           // Down
+                        6: { code: 'KeyA', name: 'A' },           // Left
+                        7: { code: 'KeyD', name: 'D' },           // Right
+                        12: { code: 'KeyI', name: 'I' },          // C-Up
+                        13: { code: 'KeyK', name: 'K' },          // C-Down
+                        14: { code: 'KeyJ', name: 'J' },          // C-Left
+                        15: { code: 'KeyL', name: 'L' }           // C-Right
+                    }
+                };
+            } else if (isBanjo) {
+                // Banjo-Kazooie Controls:
+                // A Button (Jump): Z
+                // B Button (Attack/Hit): X
+                // Z Trigger (Crouch/Roll): C
+                // Movement: WASD
+                // C-Buttons (Camera/Eggs): IJKL
+                // L/R: Q and E
+                // Start: Enter
+                EJS_defaultControls = {
+                    0: {
+                        0: { code: 'KeyZ', name: 'Z' },           // A = Z (Jump)
+                        1: { code: 'KeyX', name: 'X' },           // B = X (Attack)
+                        2: { code: 'KeyC', name: 'C' },           // Z = C (Crouch/Roll)
+                        3: { code: 'Enter', name: 'Enter' },      // Start
+                        4: { code: 'KeyW', name: 'W' },           // Up
+                        5: { code: 'KeyS', name: 'S' },           // Down
+                        6: { code: 'KeyA', name: 'A' },           // Left
+                        7: { code: 'KeyD', name: 'D' },           // Right
+                        10: { code: 'KeyQ', name: 'Q' },          // L
+                        11: { code: 'KeyE', name: 'E' },          // R
+                        12: { code: 'KeyI', name: 'I' },          // C-Up
+                        13: { code: 'KeyK', name: 'K' },          // C-Down
+                        14: { code: 'KeyJ', name: 'J' },          // C-Left
+                        15: { code: 'KeyL', name: 'L' }           // C-Right
+                    }
+                };
+            } else if (isZelda) {
+                // Zelda Controls:
+                // A Button (Action/Talk/Confirm): Z
+                // B Button (Sword/Attack): X
+                // Z-Targeting (Shield/Lock-on): C or Left Shift
+                // Movement: WASD or Arrow Keys
+                // C-Left/Right/Down: A, S, D
+                // C-Up (First-Person/Navi): W or E
+                // Start: Enter or Spacebar
+                EJS_defaultControls = {
+                    0: {
+                        0: { code: 'KeyZ', name: 'Z' },           // A = Z (Action/Talk)
+                        1: { code: 'KeyX', name: 'X' },           // B = X (Sword/Attack)
+                        2: { code: 'ShiftLeft', name: 'Left Shift' }, // Z-Target = Left Shift
+                        3: { code: 'Enter', name: 'Enter' },      // Start = Enter
+                        4: { code: 'ArrowUp', name: 'Up Arrow' }, // Up
+                        5: { code: 'ArrowDown', name: 'Down Arrow' }, // Down
+                        6: { code: 'ArrowLeft', name: 'Left Arrow' }, // Left
+                        7: { code: 'ArrowRight', name: 'Right Arrow' }, // Right
+                        12: { code: 'KeyW', name: 'W' },          // C-Up (Navi/First Person)
+                        13: { code: 'KeyD', name: 'D' },          // C-Down
+                        14: { code: 'KeyA', name: 'A' },          // C-Left
+                        15: { code: 'KeyS', name: 'S' }           // C-Right
+                    }
+                };
+            }
+
+            // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
             EJS_core = 'mupen64plus_next';
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
             EJS_pathtodata = 'data/';
-
-            // Auto-start
             EJS_startOnLoaded = true;
             EJS_volume = 1;
             EJS_AdUrl = '';
@@ -174,45 +223,36 @@
             EJS_disableAutoLang = true;
             EJS_language = 'en-US';
 
-            // DISABLE all caching - prevents version errors
-            EJS_CacheLimit = 0;
-            EJS_disableLocalStorage = true;
+            // ENABLE local save data (auto-saves to IndexedDB)
+            EJS_CacheLimit = 524288000; // 500MB cache for ROMs + saves
+            EJS_disableLocalStorage = false;
 
-            // MAXIMUM PERFORMANCE OPTIONS for 4GB RAM + low CPU
+            // Disable cheats entirely (prevents memory access out of bounds crash)
+            EJS_cheats = [];
+
+            // Performance options
             EJS_defaultOptions = {
-                // Video plugin - GlideN64 is fastest with WebGL2
                 'mupen64plus-next-gfxplugin': 'GlideN64',
-                // Native N64 resolution - lowest possible for max FPS
                 'mupen64plus-next-screensize': '320x240',
-                // 4:3 aspect ratio
                 'mupen64plus-next-aspect': '4:3',
-                // Aggressive frame skip - skip up to 3 frames when behind
                 'mupen64plus-next-frame-skip': '3',
-                // Disable ALL visual effects that cost CPU
                 'mupen64plus-next-enable-fog': 'disabled',
                 'mupen64plus-next-enable-screenshot': 'disabled',
-                // Disable texture filtering (nearest neighbor = fastest)
                 'mupen64plus-next-filtering': 'disabled',
-                // Disable depth buffer optimizations
                 'mupen64plus-next-enable-depth': 'disabled',
-                // Smaller audio buffer = less latency but might crackle
                 'mupen64plus-next-audio-buffer-size': '2048',
-                // Use HLE RSP (faster than LLE)
                 'mupen64plus-next-rsp-plugin': 'HLE',
-                // Disable texture cache
                 'mupen64plus-next-cache-textures': 'disabled'
             };
 
             EJS_debug = false;
 
-            // Load the emulator AFTER cache is cleared and options are set
-            // Add cache-busting parameter to force browser to load latest version
+            // Load emulator with cache-busting
             var script = document.createElement('script');
             script.src = 'data/loader.js?v=' + Date.now();
             document.body.appendChild(script);
         }
 
-        // Start loading
         loadGame();
     </script>
 </body>
