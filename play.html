@@ -77,9 +77,9 @@
 
                 // List of known EmulatorJS database names to destroy
                 const dbsToDelete = [
+                    'EmulatorJS-roms', 'EmulatorJS-bios', 'EmulatorJS-core', 'EmulatorJS-states',
                     'EJS_roms', 'EJS_roms_v2', 'EJS_roms_v3',
-                    'EJS_states', 'EJS_save',
-                    '/data/saves', 'EJS_storage',
+                    'EJS_states', 'EJS_save', 'EJS_storage',
                     'EJS_binary', 'EJS_cores'
                 ];
 
@@ -89,9 +89,17 @@
                         const req = indexedDB.deleteDatabase(dbName);
                         req.onsuccess = checkDone;
                         req.onerror = checkDone;
-                        req.onblocked = function() { setTimeout(checkDone, 100); };
+                        req.onblocked = function() {
+                            // If blocked, force-resolve after 500ms
+                            setTimeout(checkDone, 500);
+                        };
                     } catch(e) { checkDone(); }
                 }
+
+                // Safety timeout: resolve after 2 seconds no matter what
+                setTimeout(resolve, 2000);
+
+                if (pending === 0) resolve();
 
                 // Also clear all localStorage keys that start with EJS_
                 try {
@@ -128,6 +136,9 @@
                         window.location.href = 'index.html';
                         return;
                     }
+                    // CLOSE our database connection before nuking other DBs
+                    // This prevents "blocked" state on deleteDatabase
+                    db.close();
                 } catch (err) {
                     alert('Error loading game: ' + err.message);
                     window.location.href = 'index.html';
