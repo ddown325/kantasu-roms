@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kantasu-Roms</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0d0ff;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #6a0dad 0%, #8a2be2 50%, #9370db 100%);
+            padding: 30px 20px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
+            border-bottom: 3px solid #dda0dd;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 0 0 20px rgba(186, 85, 211, 0.8);
+            letter-spacing: 2px;
+        }
+
+        .header .subtitle {
+            color: #e6e6fa;
+            font-size: 1rem;
+            margin-top: 8px;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+            background: rgba(26, 10, 46, 0.8);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(186, 85, 211, 0.3);
+        }
+
+        .tab-btn {
+            padding: 12px 32px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border: 2px solid #8a2be2;
+            border-radius: 8px;
+            background: transparent;
+            color: #e0d0ff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn:hover {
+            background: rgba(138, 43, 226, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #8a2be2, #9370db);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(138, 43, 226, 0.5);
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+            padding: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .game-card {
+            background: linear-gradient(145deg, rgba(40, 20, 60, 0.9), rgba(30, 15, 50, 0.9));
+            border: 1px solid rgba(147, 112, 219, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(138, 43, 226, 0.3);
+            border-color: #9370db;
+        }
+
+        .game-cover {
+            width: 100%;
+            height: 280px;
+            background: linear-gradient(135deg, #2a1a3e, #1a0a2e);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .game-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .game-cover .placeholder {
+            font-size: 4rem;
+            color: #9370db;
+            opacity: 0.5;
+        }
+
+        .game-info {
+            padding: 15px;
+        }
+
+        .game-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #e6e6fa;
+            margin-bottom: 5px;
+        }
+
+        .game-system {
+            font-size: 0.85rem;
+            color: #b8860b;
+            margin-bottom: 15px;
+        }
+
+        .game-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-play {
+            background: linear-gradient(135deg, #8a2be2, #9370db);
+            color: #fff;
+        }
+
+        .btn-play:hover {
+            background: linear-gradient(135deg, #9370db, #ba55d3);
+        }
+
+        .btn-download {
+            background: rgba(147, 112, 219, 0.2);
+            color: #e6e6fa;
+            border: 1px solid rgba(147, 112, 219, 0.5);
+        }
+
+        .btn-download:hover {
+            background: rgba(147, 112, 219, 0.4);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .badge-hack {
+            background: linear-gradient(135deg, #f39c12, #e67e22);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #9370db;
+            font-size: 0.85rem;
+            border-top: 1px solid rgba(147, 112, 219, 0.2);
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 { font-size: 1.8rem; }
+            .games-grid { padding: 15px; gap: 15px; }
+            .tab-btn { padding: 10px 20px; font-size: 0.95rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎮 Kantasu-Roms</h1>
+        <div class="subtitle">N64 Game Collection &mdash; Play in your browser</div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('og-roms')">OG Roms</button>
+        <button class="tab-btn" onclick="switchTab('rom-hacks')">Rom Hacks</button>
+    </div>
+
+    <div id="og-roms" class="tab-content active">
+        <div class="games-grid" id="og-grid"></div>
+    </div>
+
+    <div id="rom-hacks" class="tab-content">
+        <div class="games-grid" id="hack-grid"></div>
+    </div>
+
+    <div class="footer">
+        Kantasu-Roms &mdash; EmulatorJS powered &mdash; For educational purposes only
+    </div>
+
+    <script>
+        const games = {
+            'og-roms': [
+                {
+                    title: 'Super Mario 64',
+                    system: 'Nintendo 64',
+                    rom: 'roms/og-roms/super-mario-64.z64',
+                    cover: 'https://upload.wikimedia.org/wikipedia/en/6/6a/Super_Mario_64_box_cover.jpg'
+                },
+                {
+                    title: "The Legend of Zelda: Ocarina of Time",
+                    system: 'Nintendo 64',
+                    rom: 'roms/og-roms/ocarina-of-time.z64',
+                    cover: 'https://upload.wikimedia.org/wikipedia/en/5/57/The_Legend_of_Zelda_Ocarina_of_Time_box_art.jpg'
+                },
+                {
+                    title: "The Legend of Zelda: Majora's Mask",
+                    system: 'Nintendo 64',
+                    rom: 'roms/og-roms/majoras-mask.z64',
+                    cover: 'https://upload.wikimedia.org/wikipedia/en/4/41/The_Legend_of_Zelda_Majora%27s_Mask_box_art.jpg'
+                },
+                {
+                    title: 'Banjo-Kazooie',
+                    system: 'Nintendo 64',
+                    rom: 'roms/og-roms/banjo-kazooie.n64',
+                    cover: 'https://upload.wikimedia.org/wikipedia/en/7/7e/Banjo-Kazooie_box_art.jpg'
+                }
+            ],
+            'rom-hacks': [
+                {
+                    title: 'Super Mario 64 (Kantasu Edition)',
+                    system: 'Nintendo 64 - ROM Hack',
+                    rom: 'roms/rom-hacks/super-mario-64-patched.z64',
+                    cover: 'https://upload.wikimedia.org/wikipedia/en/6/6a/Super_Mario_64_box_cover.jpg',
+                    badge: 'HACK',
+                    badgeClass: 'badge-hack'
+                }
+            ]
+        };
+
+        function createGameCard(game) {
+            const card = document.createElement('div');
+            card.className = 'game-card';
+
+            const badge = game.badge
+                ? `<div class="badge ${game.badgeClass || ''}">${game.badge}</div>`
+                : '';
+
+            card.innerHTML = `
+                ${badge}
+                <div class="game-cover">
+                    <img src="${game.cover}" alt="${game.title}" onerror="this.parentElement.innerHTML='<div class=placeholder>🎮</div>'">
+                </div>
+                <div class="game-info">
+                    <div class="game-title">${game.title}</div>
+                    <div class="game-system">${game.system}</div>
+                    <div class="game-actions">
+                        <a href="play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}" class="btn btn-play">▶ Play</a>
+                        <a href="${game.rom}" download class="btn btn-download">⬇ Download</a>
+                    </div>
+                </div>
+            `;
+            return card;
+        }
+
+        function renderGames(tabName) {
+            const grid = document.getElementById(tabName === 'og-roms' ? 'og-grid' : 'hack-grid');
+            grid.innerHTML = '';
+            games[tabName].forEach(game => {
+                grid.appendChild(createGameCard(game));
+            });
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            event.currentTarget.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        renderGames('og-roms');
+        renderGames('rom-hacks');
+    </script>
+</body>
+</html>
