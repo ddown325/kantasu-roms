@@ -206,8 +206,9 @@
             EJS_debug = false;
 
             // Load the emulator AFTER cache is cleared and options are set
+            // Add cache-busting parameter to force browser to load latest version
             var script = document.createElement('script');
-            script.src = 'data/loader.js';
+            script.src = 'data/loader.js?v=' + Date.now();
             document.body.appendChild(script);
         }
 

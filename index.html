@@ -234,16 +234,15 @@
         function createGameCard(game, index) {
             const card = document.createElement('div');
             card.className = 'game-card'; card.tabIndex = 0; card.dataset.index = index;
-            const badge = game.isUser ? '<div class="badge">Yours</div>' : '';
-            const hackBadge = (currentTab === 'rom-hacks' && !game.isUser) ? '<div class="badge">Hack</div>' : '';
-            const deleteBtn = game.isUser ? `<button class="delete-btn" data-id="${game.id}">&times;</button>` : '';
+            const badge = '';
+            const hackBadge = '';
+            const deleteBtn = '';
             const cover = game.cover || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>Game</text></svg>';
             card.innerHTML = `${deleteBtn}${badge}${hackBadge}
                 <div class="game-cover"><img src="${cover}" alt="${game.title}" loading="lazy"></div>
                 <div class="play-hint">&#9654;</div>
                 <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>`;
-            card.addEventListener('click', (e) => {
-                if (e.target.classList.contains('delete-btn')) { e.stopPropagation(); deleteUserGame(game.id); return; }
+            card.addEventListener('click', () => {
                 playGame(game);
             });
             card.addEventListener('focus', () => selectCard(index));
