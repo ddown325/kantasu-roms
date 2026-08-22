@@ -18,23 +18,33 @@
         .nav {
             background: linear-gradient(90deg, #6a0dad 0%, #8a2be2 50%, #9370db 100%);
             width: 100%;
-            padding: 15px 20px;
+            padding: 12px 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
         }
-        .nav a { color: #fff; text-decoration: none; font-size: 1.2rem; font-weight: 600; }
-        .nav .game-name { color: #e6e6fa; font-size: 1.1rem; }
-        #game-container { width: 100%; max-width: 900px; margin: 20px auto; padding: 0 15px; }
-        #game { width: 100%; height: 600px; max-height: 80vh; }
-        @media (max-width: 600px) { #game { height: 400px; } .nav .game-name { font-size: 0.9rem; } }
+        .nav a { color: #fff; text-decoration: none; font-size: 1.1rem; font-weight: 600; }
+        .nav .game-name { color: #e6e6fa; font-size: 1rem; }
+        .nav .perf-badge {
+            background: rgba(0, 255, 100, 0.2);
+            border: 1px solid rgba(0, 255, 100, 0.5);
+            color: #00ff88;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        #game-container { width: 100%; max-width: 1000px; margin: 10px auto; padding: 0 10px; }
+        #game { width: 100%; height: 620px; max-height: 85vh; }
+        @media (max-width: 600px) { #game { height: 420px; } .nav .game-name { font-size: 0.85rem; } .nav .perf-badge { display: none; } }
     </style>
 </head>
 <body>
     <div class="nav">
         <a href="index.html">&larr; Kantasu-Roms</a>
         <div class="game-name" id="game-name">Loading...</div>
+        <div class="perf-badge">&#9889; LOW LATENCY</div>
     </div>
     <div id="game-container">
         <div id="game"></div>
@@ -56,12 +66,36 @@
         EJS_gameUrl = romUrl;
         EJS_gameName = gameName;
         EJS_pathtodata = 'data/';
+
+        // Auto-start immediately
         EJS_startOnLoaded = true;
         EJS_volume = 1;
         EJS_AdUrl = '';
         EJS_color = '#8a2be2';
         EJS_disableAutoLang = true;
         EJS_language = 'en-US';
+
+        // Cache ROMs in IndexedDB (500MB) for instant reloads
+        EJS_CacheLimit = 524288000;
+
+        // Core-specific performance options
+        // Note: audio_latency and video_vsync are already patched in emulator.min.js
+        EJS_defaultOptions = {
+            // Use GlideN64 video plugin (best compatibility with WebGL2)
+            'mupen64plus-next-gfxplugin': 'GlideN64',
+            // Native N64 resolution (320x240) for maximum speed
+            'mupen64plus-next-screensize': '320x240',
+            // 4:3 aspect ratio (original)
+            'mupen64plus-next-aspect': '4:3',
+            // Frame skip: skip 1 frame when behind (smooth gameplay)
+            'mupen64plus-next-frame-skip': '1',
+            // Disable fog (minor speed boost)
+            'mupen64plus-next-enable-fog': 'disabled',
+            // Disable screenshots (saves memory)
+            'mupen64plus-next-enable-screenshot': 'disabled'
+        };
+
+        EJS_debug = false;
     </script>
     <script src="data/loader.js"></script>
 </body>
