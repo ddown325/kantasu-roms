@@ -128,85 +128,116 @@
             var isZelda = gameLower.includes('zelda') || gameLower.includes('ocarina') || gameLower.includes('majora');
 
             // ===== DEFAULT CONTROLLER MAPPINGS =====
-            // Format: EJS_defaultControls[playerNum] = { 0: { code: keycode, name: 'key name' }, ... }
-            // Button IDs: 0=A, 1=B, 2=Select, 3=Start, 4=Up, 5=Down, 6=Left, 7=Right,
-            //             8=A(2), 9=B(2), 10=L, 11=R, 12=C-Up, 13=C-Down, 14=C-Left, 15=C-Right
+            // See format notes below (EmulatorJS 4.x). Games matching no keyword
+            // (e.g. B3313, Dream 64, The Backrooms 64) fall back to EmulatorJS
+            // built-in defaults, which load and play fine.
 
+            // EmulatorJS 4.x controls format (REQUIRED, or every launch crashes in setupKeys):
+            //   EJS_defaultControls = { 0: { <buttonId>: { value: '<keyName>', value2: '<gamepadLabel>' } }, 1: {}, 2: {}, 3: {} }
+            //   - All four players (0-3) must exist (empty objects for 1-3), or setupKeys() throws
+            //     'TypeError: Cannot read properties of undefined' and the game never loads.
+            //   - 'value'  = keyboard key name (lowercase, per EmulatorJS keyMap: 'c', 'x', 'shift', 'up arrow', ...)
+            //   - 'value2' = gamepad label (kept identical to EmulatorJS built-ins so controllers keep working)
+            // N64 button IDs: 0=A, 1=B, 3=Start, 4-7=D-Pad, 10=L, 11=R, 12=Z-Trigger,
+            //                 16=Stick Right, 17=Stick Left, 18=Stick Down, 19=Stick Up,
+            //                 20=C-Right, 21=C-Left, 22=C-Down, 23=C-Up
             if (isSM64) {
                 // SM64 Controls:
                 // A Button (Jump): C
                 // B Button (Punch/Attack): X
                 // Z Trigger (Crouch/Ground Pound): Z
-                // Movement: WASD
+                // Movement (Analog Stick): WASD
                 // Camera (C-Buttons): IJKL
                 // Start: Enter
-                EJS_defaultControls = {
+                window.EJS_defaultControls = {
                     0: {
-                        0: { code: 'KeyC', name: 'C' },           // A = C (Jump)
-                        1: { code: 'KeyX', name: 'X' },           // B = X (Punch/Attack)
-                        2: { code: 'KeyZ', name: 'Z' },           // Z = Z (Crouch/Ground Pound)
-                        3: { code: 'Enter', name: 'Enter' },      // Start
-                        4: { code: 'KeyW', name: 'W' },           // Up
-                        5: { code: 'KeyS', name: 'S' },           // Down
-                        6: { code: 'KeyA', name: 'A' },           // Left
-                        7: { code: 'KeyD', name: 'D' },           // Right
-                        12: { code: 'KeyI', name: 'I' },          // C-Up
-                        13: { code: 'KeyK', name: 'K' },          // C-Down
-                        14: { code: 'KeyJ', name: 'J' },          // C-Left
-                        15: { code: 'KeyL', name: 'L' }           // C-Right
-                    }
+                        0:  { value: 'c',     value2: 'BUTTON_2' },           // A = C (Jump)
+                        1:  { value: 'x',     value2: 'BUTTON_4' },           // B = X (Punch/Attack)
+                        2:  { value: 'v',     value2: 'SELECT' },             // (unused on N64)
+                        3:  { value: 'enter', value2: 'START' },              // Start
+                        4:  { value: 'up arrow',    value2: 'DPAD_UP' },      // D-Pad Up
+                        5:  { value: 'down arrow',  value2: 'DPAD_DOWN' },    // D-Pad Down
+                        6:  { value: 'left arrow',  value2: 'DPAD_LEFT' },    // D-Pad Left
+                        7:  { value: 'right arrow', value2: 'DPAD_RIGHT' },   // D-Pad Right
+                        10: { value: 'q', value2: 'LEFT_TOP_SHOULDER' },      // L
+                        11: { value: 'e', value2: 'RIGHT_TOP_SHOULDER' },     // R
+                        12: { value: 'z', value2: 'LEFT_BOTTOM_SHOULDER' },   // Z = Z (Crouch/Ground Pound)
+                        16: { value: 'd', value2: 'LEFT_STICK_X:+1' },        // Stick Right
+                        17: { value: 'a', value2: 'LEFT_STICK_X:-1' },        // Stick Left
+                        18: { value: 's', value2: 'LEFT_STICK_Y:+1' },        // Stick Down
+                        19: { value: 'w', value2: 'LEFT_STICK_Y:-1' },        // Stick Up
+                        20: { value: 'l', value2: 'RIGHT_STICK_X:+1' },      // C-Right
+                        21: { value: 'j', value2: 'RIGHT_STICK_X:-1' },      // C-Left
+                        22: { value: 'k', value2: 'RIGHT_STICK_Y:+1' },      // C-Down
+                        23: { value: 'i', value2: 'RIGHT_STICK_Y:-1' }       // C-Up
+                    },
+                    1: {}, 2: {}, 3: {}
                 };
             } else if (isBanjo) {
                 // Banjo-Kazooie Controls:
                 // A Button (Jump): Z
                 // B Button (Attack/Hit): X
                 // Z Trigger (Crouch/Roll): C
-                // Movement: WASD
+                // Movement (Analog Stick): WASD
                 // C-Buttons (Camera/Eggs): IJKL
                 // L/R: Q and E
                 // Start: Enter
-                EJS_defaultControls = {
+                window.EJS_defaultControls = {
                     0: {
-                        0: { code: 'KeyZ', name: 'Z' },           // A = Z (Jump)
-                        1: { code: 'KeyX', name: 'X' },           // B = X (Attack)
-                        2: { code: 'KeyC', name: 'C' },           // Z = C (Crouch/Roll)
-                        3: { code: 'Enter', name: 'Enter' },      // Start
-                        4: { code: 'KeyW', name: 'W' },           // Up
-                        5: { code: 'KeyS', name: 'S' },           // Down
-                        6: { code: 'KeyA', name: 'A' },           // Left
-                        7: { code: 'KeyD', name: 'D' },           // Right
-                        10: { code: 'KeyQ', name: 'Q' },          // L
-                        11: { code: 'KeyE', name: 'E' },          // R
-                        12: { code: 'KeyI', name: 'I' },          // C-Up
-                        13: { code: 'KeyK', name: 'K' },          // C-Down
-                        14: { code: 'KeyJ', name: 'J' },          // C-Left
-                        15: { code: 'KeyL', name: 'L' }           // C-Right
-                    }
+                        0:  { value: 'z',     value2: 'BUTTON_2' },           // A = Z (Jump)
+                        1:  { value: 'x',     value2: 'BUTTON_4' },           // B = X (Attack)
+                        2:  { value: 'v',     value2: 'SELECT' },             // (unused on N64)
+                        3:  { value: 'enter', value2: 'START' },              // Start
+                        4:  { value: 'up arrow',    value2: 'DPAD_UP' },      // D-Pad Up
+                        5:  { value: 'down arrow',  value2: 'DPAD_DOWN' },    // D-Pad Down
+                        6:  { value: 'left arrow',  value2: 'DPAD_LEFT' },    // D-Pad Left
+                        7:  { value: 'right arrow', value2: 'DPAD_RIGHT' },   // D-Pad Right
+                        10: { value: 'q', value2: 'LEFT_TOP_SHOULDER' },      // L
+                        11: { value: 'e', value2: 'RIGHT_TOP_SHOULDER' },     // R
+                        12: { value: 'c', value2: 'LEFT_BOTTOM_SHOULDER' },   // Z = C (Crouch/Roll)
+                        16: { value: 'd', value2: 'LEFT_STICK_X:+1' },        // Stick Right
+                        17: { value: 'a', value2: 'LEFT_STICK_X:-1' },        // Stick Left
+                        18: { value: 's', value2: 'LEFT_STICK_Y:+1' },        // Stick Down
+                        19: { value: 'w', value2: 'LEFT_STICK_Y:-1' },        // Stick Up
+                        20: { value: 'l', value2: 'RIGHT_STICK_X:+1' },      // C-Right
+                        21: { value: 'j', value2: 'RIGHT_STICK_X:-1' },      // C-Left
+                        22: { value: 'k', value2: 'RIGHT_STICK_Y:+1' },      // C-Down
+                        23: { value: 'i', value2: 'RIGHT_STICK_Y:-1' }       // C-Up
+                    },
+                    1: {}, 2: {}, 3: {}
                 };
             } else if (isZelda) {
                 // Zelda Controls:
                 // A Button (Action/Talk/Confirm): Z
                 // B Button (Sword/Attack): X
-                // Z-Targeting (Shield/Lock-on): C or Left Shift
-                // Movement: WASD or Arrow Keys
+                // Z-Targeting (Shield/Lock-on): Left Shift
+                // Movement (Analog Stick): Arrow Keys
                 // C-Left/Right/Down: A, S, D
-                // C-Up (First-Person/Navi): W or E
-                // Start: Enter or Spacebar
-                EJS_defaultControls = {
+                // C-Up (First-Person/Navi): W
+                // Start: Enter
+                window.EJS_defaultControls = {
                     0: {
-                        0: { code: 'KeyZ', name: 'Z' },           // A = Z (Action/Talk)
-                        1: { code: 'KeyX', name: 'X' },           // B = X (Sword/Attack)
-                        2: { code: 'ShiftLeft', name: 'Left Shift' }, // Z-Target = Left Shift
-                        3: { code: 'Enter', name: 'Enter' },      // Start = Enter
-                        4: { code: 'ArrowUp', name: 'Up Arrow' }, // Up
-                        5: { code: 'ArrowDown', name: 'Down Arrow' }, // Down
-                        6: { code: 'ArrowLeft', name: 'Left Arrow' }, // Left
-                        7: { code: 'ArrowRight', name: 'Right Arrow' }, // Right
-                        12: { code: 'KeyW', name: 'W' },          // C-Up (Navi/First Person)
-                        13: { code: 'KeyD', name: 'D' },          // C-Down
-                        14: { code: 'KeyA', name: 'A' },          // C-Left
-                        15: { code: 'KeyS', name: 'S' }           // C-Right
-                    }
+                        0:  { value: 'z',     value2: 'BUTTON_2' },           // A = Z (Action/Talk)
+                        1:  { value: 'x',     value2: 'BUTTON_4' },           // B = X (Sword/Attack)
+                        2:  { value: 'v',     value2: 'SELECT' },             // (unused on N64)
+                        3:  { value: 'enter', value2: 'START' },              // Start
+                        4:  { value: 'up arrow',    value2: 'DPAD_UP' },      // D-Pad Up
+                        5:  { value: 'down arrow',  value2: 'DPAD_DOWN' },    // D-Pad Down
+                        6:  { value: 'left arrow',  value2: 'DPAD_LEFT' },    // D-Pad Left
+                        7:  { value: 'right arrow', value2: 'DPAD_RIGHT' },   // D-Pad Right
+                        10: { value: 'q', value2: 'LEFT_TOP_SHOULDER' },      // L
+                        11: { value: 'e', value2: 'RIGHT_TOP_SHOULDER' },     // R
+                        12: { value: 'shift', value2: 'LEFT_BOTTOM_SHOULDER' }, // Z-Target = Left Shift
+                        16: { value: 'right arrow', value2: 'LEFT_STICK_X:+1' }, // Stick Right
+                        17: { value: 'left arrow',  value2: 'LEFT_STICK_X:-1' }, // Stick Left
+                        18: { value: 'down arrow',  value2: 'LEFT_STICK_Y:+1' }, // Stick Down
+                        19: { value: 'up arrow',    value2: 'LEFT_STICK_Y:-1' }, // Stick Up
+                        20: { value: 's', value2: 'RIGHT_STICK_X:+1' },      // C-Right
+                        21: { value: 'a', value2: 'RIGHT_STICK_X:-1' },      // C-Left
+                        22: { value: 'd', value2: 'RIGHT_STICK_Y:+1' },      // C-Down
+                        23: { value: 'w', value2: 'RIGHT_STICK_Y:-1' }       // C-Up (Navi/First Person)
+                    },
+                    1: {}, 2: {}, 3: {}
                 };
             }
 
