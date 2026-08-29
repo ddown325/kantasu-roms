@@ -1,2 +1,6 @@
-# EmulatorJS cache
-data/cores/
+# EmulatorJS cache (local run artifacts) - but ship the core packages
+# and core report JSON so first launches load same-origin and the core
+# can be cached persistently in IndexedDB.
+data/cores/*
+!data/cores/reports/
+!data/cores/*.data

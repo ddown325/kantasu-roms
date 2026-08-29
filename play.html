@@ -63,25 +63,14 @@
             });
         }
 
-        // ===== CACHE CLEAR =====
-        function nukeCaches() {
-            return new Promise((resolve) => {
-                const dbsToDelete = [
-                    'EmulatorJS-roms', 'EmulatorJS-bios', 'EmulatorJS-core', 'EmulatorJS-states'
-                ];
-                let pending = dbsToDelete.length;
-                if (pending === 0) { resolve(); return; }
-                for (const dbName of dbsToDelete) {
-                    try {
-                        const req = indexedDB.deleteDatabase(dbName);
-                        req.onsuccess = () => { if (--pending === 0) resolve(); };
-                        req.onerror = () => { if (--pending === 0) resolve(); };
-                        req.onblocked = () => { setTimeout(() => { if (--pending === 0) resolve(); }, 500); };
-                    } catch(e) { if (--pending === 0) resolve(); }
-                }
-                setTimeout(resolve, 2000);
-            });
-        }
+        // ===== CACHING (DO NOT NUKE) =====
+        // The old nukeCaches() deleted EmulatorJS-roms / -core / -states on EVERY
+        // launch, forcing a full re-download of the emulator core and the entire
+        // ROM (up to 234MB) each time a game was opened, and destroying save
+        // states. The bugs it worked around (corrupted emulator.min.js) are fixed,
+        // so caching is now safe and makes repeat launches near-instant.
+        // Manual cache clearing remains available in the emulator's own settings
+        // menu (gear icon -> Cache Manager) and in the launcher's Manage tab.
 
         // ===== MAIN LOADING LOGIC =====
         async function loadGame() {
@@ -117,9 +106,6 @@
             }
 
             document.getElementById('game-name').textContent = gameName;
-
-            // Clear old caches
-            await nukeCaches();
 
             // Determine game type for custom controls
             var gameLower = gameName.toLowerCase();
@@ -255,25 +241,54 @@
             EJS_language = 'en-US';
 
             // ENABLE local save data (auto-saves to IndexedDB)
-            EJS_CacheLimit = 524288000; // 500MB cache for ROMs + saves
+            // 2GB cache limit so every built-in ROM (~700MB total) + the emulator
+            // core stays cached in IndexedDB between sessions (default was 500MB).
+            EJS_CacheLimit = 2147483648;
             EJS_disableLocalStorage = false;
 
             // Disable cheats entirely (prevents memory access out of bounds crash)
             EJS_cheats = [];
 
-            // Performance options
+            // ===== PERFORMANCE + QUALITY OPTIONS =====
+            // These are the REAL mupen64plus-next core options (verified against the
+            // core binary shipped with EmulatorJS 4.2.3). The previous config used
+            // made-up 'mupen64plus-next-*' keys that the core silently ignored, so
+            // none of them ever took effect and games ran on slow defaults.
+            //
+            // Biggest wins:
+            //  - cpucore 'cached_interpreter': fastest CPU core available in the
+            //    WASM build (dynamic_recompiler does not exist in browser builds).
+            //  - EnableCopyColorToRDRAM 'Off' / EnableCopyDepthToRDRAM 'Off':
+            //    the defaults ('Sync'/'Software') force expensive GPU->CPU
+            //    framebuffer readbacks that stall rendering every frame - the main
+            //    source of in-game lag and audio crackle in the browser.
+            //  - 640x480 internal resolution (2x native N64) + 3-point filtering
+            //    (authentic N64 texture filtering) + per-pixel HW lighting:
+            //    visibly sharper and smoother than before at no real cost.
+            // Values can be changed per-game in the emulator settings menu.
             EJS_defaultOptions = {
-                'mupen64plus-next-gfxplugin': 'GlideN64',
-                'mupen64plus-next-screensize': '320x240',
-                'mupen64plus-next-aspect': '4:3',
-                'mupen64plus-next-frame-skip': '3',
-                'mupen64plus-next-enable-fog': 'disabled',
-                'mupen64plus-next-enable-screenshot': 'disabled',
-                'mupen64plus-next-filtering': 'disabled',
-                'mupen64plus-next-enable-depth': 'disabled',
-                'mupen64plus-next-audio-buffer-size': '2048',
-                'mupen64plus-next-rsp-plugin': 'HLE',
-                'mupen64plus-next-cache-textures': 'disabled'
+                // CPU - fastest available core
+                'mupen64plus-cpucore': 'cached_interpreter',
+                // Rendering
+                'mupen64plus-43screensize': '640x480',
+                'mupen64plus-aspect': '4:3',
+                'mupen64plus-EnableNativeResFactor': '0',
+                'mupen64plus-BilinearMode': '3point',
+                'mupen64plus-EnableHWLighting': 'True',
+                // Framebuffer readbacks OFF (the big lag fix)
+                'mupen64plus-EnableFBEmulation': 'True',
+                'mupen64plus-EnableCopyColorToRDRAM': 'Off',
+                'mupen64plus-EnableCopyDepthToRDRAM': 'Off',
+                'mupen64plus-EnableCopyAuxToRDRAM': 'False',
+                'mupen64plus-EnableCopyColorFromRDRAM': 'False',
+                // Frame pacing
+                'mupen64plus-Framerate': 'Original',
+                'mupen64plus-FrameDuping': 'False',
+                'mupen64plus-ThreadedRenderer': 'False',
+                // Texture handling
+                'mupen64plus-EnableTextureCache': 'True',
+                'mupen64plus-MaxTxCacheSize': '8000',
+                'mupen64plus-EnableLegacyBlending': 'True'
             };
 
             EJS_debug = false;
