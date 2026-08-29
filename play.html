@@ -21,7 +21,8 @@
         .back-btn { color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; gap: 8px; }
         .back-btn:hover { color: #b06fd3; }
         .game-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
-        .perf-badge { background: rgba(147, 112, 219, 0.15); border: 1px solid rgba(147, 112, 219, 0.4); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .perf-badge { background: rgba(147, 112, 219, 0.15); border: 1px solid rgba(147, 112, 219, 0.4); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-family: inherit; cursor: pointer; }
+        .perf-badge:hover { background: rgba(147, 112, 219, 0.3); color: #b06fd3; }
         #game-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
         #game { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     </style>
@@ -32,7 +33,7 @@
             <a href="index.html" class="back-btn">&#8592; Back</a>
             <div class="game-name" id="game-name">Loading...</div>
         </div>
-        <div class="perf-badge">Max Performance</div>
+        <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Sharp (2x)</button>
     </div>
     <div id="game-container">
         <div id="game"></div>
@@ -240,6 +241,39 @@
             EJS_disableAutoLang = true;
             EJS_language = 'en-US';
 
+            // ===== QUALITY MODE (Smooth / Sharp) =====
+            // Smooth: native 320x240 internal resolution + no per-pixel HW
+            //   lighting - 4x fewer pixels to rasterize. The fix for weak /
+            //   integrated / software GPUs where high resolution causes lag.
+            // Sharp: 2x (640x480) resolution + per-pixel HW lighting - the
+            //   best-looking option for capable GPUs.
+            // Both modes keep every pure-speed option below (fastest CPU
+            // core, HLE RSP, no framebuffer readbacks, frame duping), so
+            // Smooth only trades *graphics fidelity* for headroom.
+            // Persisted in localStorage, overridable per-launch via
+            // ?mode=smooth or ?mode=sharp.
+            var savedMode = null;
+            try { savedMode = localStorage.getItem('kantasu_quality_mode'); } catch (e) {}
+            var modeParam = params.get('mode');
+            var MODE = (modeParam === 'smooth' || modeParam === 'sharp') ? modeParam
+                     : (savedMode === 'smooth' || savedMode === 'sharp') ? savedMode
+                     : 'sharp';
+            var SMOOTH = (MODE === 'smooth');
+            try { localStorage.setItem('kantasu_quality_mode', MODE); } catch (e) {}
+            var qToggle = document.getElementById('quality-toggle');
+            if (qToggle) {
+                qToggle.textContent = SMOOTH ? 'Smooth (1x)' : 'Sharp (2x)';
+                qToggle.addEventListener('click', function () {
+                    var next = SMOOTH ? 'sharp' : 'smooth';
+                    try { localStorage.setItem('kantasu_quality_mode', next); } catch (e) {}
+                    // Update the ?mode= param too, otherwise a stale URL
+                    // parameter would override the toggle after the reload.
+                    var u = new URL(window.location.href);
+                    u.searchParams.set('mode', next);
+                    window.location.href = u.href;
+                });
+            }
+
             // ENABLE local save data (auto-saves to IndexedDB)
             // 2GB cache limit so every built-in ROM (~700MB total) + the emulator
             // core stays cached in IndexedDB between sessions (default was 500MB).
@@ -250,31 +284,31 @@
             EJS_cheats = [];
 
             // ===== PERFORMANCE + QUALITY OPTIONS =====
-            // These are the REAL mupen64plus-next core options (verified against the
-            // core binary shipped with EmulatorJS 4.2.3). The previous config used
-            // made-up 'mupen64plus-next-*' keys that the core silently ignored, so
-            // none of them ever took effect and games ran on slow defaults.
-            //
-            // Biggest wins:
-            //  - cpucore 'cached_interpreter': fastest CPU core available in the
-            //    WASM build (dynamic_recompiler does not exist in browser builds).
-            //  - EnableCopyColorToRDRAM 'Off' / EnableCopyDepthToRDRAM 'Off':
-            //    the defaults ('Sync'/'Software') force expensive GPU->CPU
-            //    framebuffer readbacks that stall rendering every frame - the main
-            //    source of in-game lag and audio crackle in the browser.
-            //  - 640x480 internal resolution (2x native N64) + 3-point filtering
-            //    (authentic N64 texture filtering) + per-pixel HW lighting:
-            //    visibly sharper and smoother than before at no real cost.
-            // Values can be changed per-game in the emulator settings menu.
+            // These are the REAL mupen64plus-next core options (verified against
+            // the core binary shipped with EmulatorJS 4.2.3 and A/B tested in
+            // the browser). Pure-speed settings apply in BOTH quality modes:
+            //  - cpucore 'cached_interpreter': fastest CPU core in WASM builds
+            //    (dynamic recompilation is impossible in the browser).
+            //  - rsp-plugin 'hle': high-level RSP emulation (fastest, default).
+            //  - EnableCopyColorToRDRAM/DepthToRDRAM 'Off': the defaults
+            //    ('Sync'/'Software') force GPU->CPU framebuffer readbacks that
+            //    stall rendering every frame - the main source of in-game lag
+            //    and audio crackle.
+            //  - FrameDuping 'True': when the game hasn't rendered a new frame
+            //    (menus, pauses, load screens), the previous frame is reused
+            //    instead of re-submitting the whole scene - measurably the
+            //    best-performing configuration in browser testing.
+            // Quality-dependent settings (resolution, HW lighting) follow the
+            // Smooth/Sharp mode selected above.
             EJS_defaultOptions = {
                 // CPU - fastest available core
                 'mupen64plus-cpucore': 'cached_interpreter',
-                // Rendering
-                'mupen64plus-43screensize': '640x480',
+                // Rendering (mode-dependent)
+                'mupen64plus-43screensize': SMOOTH ? '320x240' : '640x480',
                 'mupen64plus-aspect': '4:3',
                 'mupen64plus-EnableNativeResFactor': '0',
                 'mupen64plus-BilinearMode': '3point',
-                'mupen64plus-EnableHWLighting': 'True',
+                'mupen64plus-EnableHWLighting': SMOOTH ? 'False' : 'True',
                 // Framebuffer readbacks OFF (the big lag fix)
                 'mupen64plus-EnableFBEmulation': 'True',
                 'mupen64plus-EnableCopyColorToRDRAM': 'Off',
@@ -283,8 +317,7 @@
                 'mupen64plus-EnableCopyColorFromRDRAM': 'False',
                 // Frame pacing
                 'mupen64plus-Framerate': 'Original',
-                'mupen64plus-FrameDuping': 'False',
-                'mupen64plus-ThreadedRenderer': 'False',
+                'mupen64plus-FrameDuping': 'True',
                 // Texture handling
                 'mupen64plus-EnableTextureCache': 'True',
                 'mupen64plus-MaxTxCacheSize': '8000',
