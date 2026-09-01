@@ -23,6 +23,10 @@
         .game-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
         .perf-badge { background: rgba(147, 112, 219, 0.15); border: 1px solid rgba(147, 112, 219, 0.4); color: var(--accent); padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-family: inherit; cursor: pointer; }
         .perf-badge:hover { background: rgba(147, 112, 219, 0.3); color: #b06fd3; }
+        .status-badge { background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border); color: var(--text-secondary); padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; letter-spacing: 1px; font-family: 'Consolas', 'Menlo', monospace; white-space: nowrap; }
+        .status-badge.ok { border-color: rgba(76, 175, 80, 0.45); color: #66bb6a; background: rgba(76, 175, 80, 0.08); }
+        .status-badge.warn { border-color: rgba(255, 152, 0, 0.45); color: #ffa726; background: rgba(255, 152, 0, 0.08); }
+        .nav-right { display: flex; align-items: center; gap: 10px; }
         #game-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
         #game { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     </style>
@@ -33,7 +37,11 @@
             <a href="index.html" class="back-btn">&#8592; Back</a>
             <div class="game-name" id="game-name">Loading...</div>
         </div>
-        <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Sharp (2x)</button>
+        <div class="nav-right">
+            <span class="status-badge" id="fps-badge" title="Emulated frames per second (N64 full speed is 20-30 depending on the game)">-- fps</span>
+            <span class="status-badge" id="thread-badge" title="MT = multi-threaded emulation (SharedArrayBuffer active). ST = single-threaded fallback - try Chrome/Edge or a hard refresh.">…</span>
+            <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Smooth (1x)</button>
+        </div>
     </div>
     <div id="game-container">
         <div id="game"></div>
@@ -276,6 +284,61 @@
             // falls back.
             window.EJS_threads = (window.crossOriginIsolated === true);
 
+            // ===== STATUS BADGES (fps + threading diagnostics) =====
+            // The fps badge polls the emulator's real frame counter once per
+            // second (cheap cwrap call) so players can SEE the effect of the
+            // quality toggle. The thread badge verifies actual multithreading
+            // by checking the emscripten heap type at runtime - not just the
+            // config flag - so "MT" guarantees the pthread core is live.
+            var threadBadge = document.getElementById('thread-badge');
+            var fpsBadge = document.getElementById('fps-badge');
+            if (threadBadge) {
+                threadBadge.textContent = window.EJS_threads ? 'MT' : 'ST';
+                threadBadge.className = 'status-badge ' + (window.EJS_threads ? 'ok' : 'warn');
+            }
+            window.EJS_ready = function () {
+                // Confirm multithreading against the real heap (not just config).
+                // Module.HEAPU8 may not exist yet at the exact 'ready' moment,
+                // so retry briefly instead of concluding 'ST' too early.
+                var heapVerified = false;
+                var heapTries = 0;
+                function checkHeap() {
+                    if (heapVerified || heapTries++ > 30) return; // give up after ~15s
+                    try {
+                        var heap = window.EJS_emulator && EJS_emulator.gameManager &&
+                                   EJS_emulator.gameManager.Module && EJS_emulator.gameManager.Module.HEAPU8;
+                        if (heap && heap.buffer) {
+                            heapVerified = true;
+                            var reallyThreaded = heap.buffer.constructor &&
+                                                 heap.buffer.constructor.name === 'SharedArrayBuffer';
+                            if (threadBadge) {
+                                threadBadge.textContent = reallyThreaded ? 'MT' : 'ST';
+                                threadBadge.className = 'status-badge ' + (reallyThreaded ? 'ok' : 'warn');
+                            }
+                        }
+                    } catch (e) {}
+                }
+                // Live fps readout from the core's own frame counter
+                var lastFrame = null, lastTime = null;
+                setInterval(function () {
+                    checkHeap();
+                    try {
+                        if (!window.EJS_emulator || !EJS_emulator.started ||
+                            !EJS_emulator.gameManager) return;
+                        var f = EJS_emulator.gameManager.getFrameNum();
+                        var now = performance.now();
+                        if (lastFrame !== null && now > lastTime) {
+                            var fps = (f - lastFrame) / ((now - lastTime) / 1000);
+                            if (fpsBadge && isFinite(fps)) {
+                                fpsBadge.textContent = Math.max(0, Math.round(fps)) + ' fps';
+                                fpsBadge.className = 'status-badge ' + (fps >= 19 ? 'ok' : 'warn');
+                            }
+                        }
+                        lastFrame = f; lastTime = now;
+                    } catch (e) {}
+                }, 1000);
+            };
+
             // ===== QUALITY MODE (Smooth / Sharp) =====
             // Smooth: native 320x240 internal resolution + no per-pixel HW
             //   lighting - 4x fewer pixels to rasterize. The fix for weak /
@@ -287,12 +350,28 @@
             // Smooth only trades *graphics fidelity* for headroom.
             // Persisted in localStorage, overridable per-launch via
             // ?mode=smooth or ?mode=sharp.
+            //
+            // Smooth is the DEFAULT now: 3D scenes stay at full speed on weak
+            // or integrated GPUs. The old default (Sharp = 640x480 + per-pixel
+            // lighting) caused ~17fps in 3D scenes on machines that can't
+            // push that load. One-time migration (kantasu_quality_v2 flag)
+            // resets visitors who had Sharp saved *by the old default* -
+            // after this, whatever is picked in the toggle sticks forever.
             var savedMode = null;
             try { savedMode = localStorage.getItem('kantasu_quality_mode'); } catch (e) {}
+            var migrated = false;
+            try { migrated = localStorage.getItem('kantasu_quality_v2') === '1'; } catch (e) {}
+            if (!migrated) {
+                // First visit on the new build: forget the old default and
+                // remember that this migration ran (explicit ?mode= URL
+                // params still win over everything below).
+                savedMode = null;
+                try { localStorage.setItem('kantasu_quality_v2', '1'); } catch (e) {}
+            }
             var modeParam = params.get('mode');
             var MODE = (modeParam === 'smooth' || modeParam === 'sharp') ? modeParam
                      : (savedMode === 'smooth' || savedMode === 'sharp') ? savedMode
-                     : 'sharp';
+                     : 'smooth';
             var SMOOTH = (MODE === 'smooth');
             try { localStorage.setItem('kantasu_quality_mode', MODE); } catch (e) {}
             var qToggle = document.getElementById('quality-toggle');

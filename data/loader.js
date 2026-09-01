@@ -21,7 +21,7 @@
                 if ("undefined" != typeof EJS_paths && typeof EJS_paths[file] === "string") {
                     return EJS_paths[file];
                 } else if (file.endsWith("emulator.min.js")) {
-                    return scriptPath + file + "?v=2";
+                    return scriptPath + file + "?v=3";
                 } else {
                     return scriptPath + "src/" + file;
                 }
@@ -42,7 +42,7 @@
                 if ("undefined" != typeof EJS_paths && typeof EJS_paths[file] === "string") {
                     return EJS_paths[file];
                 } else {
-                    return scriptPath + file + "?v=2";
+                    return scriptPath + file + "?v=3";
                 }
             }();
             css.onload = resolve;
