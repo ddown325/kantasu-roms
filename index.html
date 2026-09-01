@@ -445,6 +445,22 @@
         }
 
         async function init() {
+            // RELOAD GATE: coi-sw.js may be about to reload this page once for
+            // cross-origin isolation setup. Opening IndexedDB now and having
+            // the reload kill the page mid-transaction can leave the database
+            // permanently locked (games/uploads then fail to load forever
+            // until the browser is fully restarted). Skip all storage work on
+            // the pre-reload page. If registration fails (no reload after
+            // all), COI_RELOADING clears and the grid loads normally.
+            if (window.COI_RELOADING === true) {
+                try {
+                    await Promise.race([
+                        window.COI_DONE,
+                        new Promise(r => setTimeout(r, 8000))
+                    ]);
+                } catch (e) {}
+                if (window.COI_RELOADING === true) return; // reload confirmed
+            }
             await openDB();
             const stored = await dbGetAll();
             for (const g of stored) {

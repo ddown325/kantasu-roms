@@ -63,6 +63,23 @@ if (typeof window === "undefined") {
 }
 // ===== Window context =====
 else {
+    // Synchronous reload decision - set BEFORE any async work so the page
+    // can abort expensive/unsafe boot work (IndexedDB opens by the emulator)
+    // before this worker reloads the document. A page killed mid-IndexedDB-
+    // transaction leaves the database permanently locked (open() hangs
+    // forever -> "game never loads"). This gate prevents that class of bug.
+    // COI_RELOADING === true means: this page WILL be replaced by a reload in
+    // a moment - do not start anything that must not be interrupted.
+    window.COI_RELOADING = false;
+    if (!window.crossOriginIsolated && "serviceWorker" in navigator) {
+        let flagSet = false;
+        try { flagSet = sessionStorage.getItem("coiReloadedBySelf") === "1"; } catch (e) {}
+        // No controller on this load + not attempted yet this session ->
+        // registration + reload is unavoidable (barring registration failure,
+        // which clears the flag below).
+        if (!flagSet && !navigator.serviceWorker.controller) window.COI_RELOADING = true;
+    }
+
     // Exposed so the page can await the isolation attempt before choosing
     // which emulator core build to load (threaded vs single-threaded).
     window.COI_DONE = (async () => {
@@ -84,7 +101,7 @@ else {
 
         try {
             await navigator.serviceWorker.register("coi-sw.js");
-            if (window.crossOriginIsolated) return "isolated-late";
+            if (window.crossOriginIsolated) { window.COI_RELOADING = false; return "isolated-late"; }
             // Give a freshly-installed worker a moment to activate and claim
             // this page, then reload so the document is served through the
             // worker with COI headers.
@@ -98,6 +115,8 @@ else {
             location.reload();
             return "reloading";
         } catch (err) {
+            // Registration failed - no reload is coming, let the page boot.
+            window.COI_RELOADING = false;
             console.warn("[coi-sw] registration failed (emulator stays single-threaded):", err);
             return "failed";
         }

@@ -27,6 +27,19 @@
         .status-badge.ok { border-color: rgba(76, 175, 80, 0.45); color: #66bb6a; background: rgba(76, 175, 80, 0.08); }
         .status-badge.warn { border-color: rgba(255, 152, 0, 0.45); color: #ffa726; background: rgba(255, 152, 0, 0.08); }
         .nav-right { display: flex; align-items: center; gap: 10px; }
+        /* Boot watchdog overlay - shown when a game fails to start */
+        #boot-panel { position: fixed; inset: 0; z-index: 9999; background: rgba(13, 13, 13, 0.92); display: flex; align-items: center; justify-content: center; }
+        #boot-panel .panel { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 28px; max-width: 480px; width: calc(100% - 40px); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+        #boot-panel h2 { font-size: 1.05rem; margin-bottom: 8px; color: var(--text-primary); }
+        #boot-panel p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.5; }
+        #boot-panel .phase { font-family: 'Consolas', 'Menlo', monospace; font-size: 0.78rem; color: var(--accent); background: rgba(147,112,219,0.1); border: 1px solid rgba(147,112,219,0.3); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; word-break: break-word; }
+        #boot-panel .errors { font-family: 'Consolas', 'Menlo', monospace; font-size: 0.72rem; color: #ff8a80; background: rgba(244,67,54,0.06); border: 1px solid rgba(244,67,54,0.25); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; max-height: 110px; overflow-y: auto; word-break: break-word; white-space: pre-wrap; }
+        #boot-panel .btns { display: flex; gap: 10px; flex-wrap: wrap; }
+        #boot-panel button { border: none; border-radius: 8px; padding: 10px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+        #boot-panel .primary { background: var(--accent); color: #fff; }
+        #boot-panel .primary:hover { background: #b06fd3; }
+        #boot-panel .secondary { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border); }
+        #boot-panel .secondary:hover { color: var(--text-primary); }
         #game-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
         #game { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     </style>
@@ -45,6 +58,19 @@
     </div>
     <div id="game-container">
         <div id="game"></div>
+    </div>
+    <div id="boot-panel" style="display:none">
+        <div class="panel">
+            <h2 id="boot-title">This game is taking a while to load</h2>
+            <p id="boot-desc">If it never finishes, one of the options below will almost always fix it. Safe Mode switches to the single-threaded emulator core (no worker threads) - slightly lower performance, but loads on every browser.</p>
+            <div class="phase" id="boot-phase">Loading\u2026</div>
+            <div class="errors" id="boot-errors" style="display:none"></div>
+            <div class="btns">
+                <button class="primary" id="boot-safe">Safe Mode + Retry</button>
+                <button class="secondary" id="boot-clear">Clear Cache + Retry</button>
+                <button class="secondary" id="boot-wait">Keep Waiting</button>
+            </div>
+        </div>
     </div>
     <!-- coi-sw.js: enables crossOriginIsolated (SharedArrayBuffer) via a service
          worker that injects COOP/COEP headers on GitHub Pages. EmulatorJS then
@@ -94,6 +120,128 @@
             var gameName = '';
             var userGameId = params.get('usergame');
 
+            // ===== RELOAD GATE (prevents permanent IndexedDB lockups) =====
+            // coi-sw.js sets COI_RELOADING synchronously when this page is
+            // about to be replaced by the one-time cross-origin-isolation
+            // reload. Starting the emulator (or any IndexedDB work) here
+            // would leave databases permanently locked when the reload kills
+            // the page mid-transaction - the "games never load again" state.
+            // If a reload is coming, wait for it (bounded); if registration
+            // fails and no reload happens after all, boot normally.
+            if (window.COI_RELOADING === true) {
+                document.getElementById('game-name').textContent =
+                    (params.get('name') || 'Game') + ' \u2014 preparing...';
+                try {
+                    await Promise.race([
+                        window.COI_DONE,
+                        new Promise(function (r) { setTimeout(r, 8000); })
+                    ]);
+                } catch (e) {}
+                if (window.COI_RELOADING === true) return; // reload confirmed
+                document.getElementById('game-name').textContent = params.get('name') || 'Game';
+            }
+
+            // ===== STORAGE HEALTH PROBE + AUTO-REPAIR =====
+            // If a previous session was killed mid-transaction (browser crash,
+            // force-close, interrupted reload), the emulator's IndexedDB
+            // databases can be stuck in a locked state where open() never
+            // resolves. Symptom: every game hangs forever at "Download Game
+            // Core" with no error. Probe each database with a timeout BEFORE
+            // any storage access; delete-and-recreate the re-downloadable
+            // caches (core/roms/bios) automatically. User data (uploaded
+            // games, saves, save states) is NEVER auto-deleted - a clear
+            // instruction panel is shown instead (verified fix: fully
+            // quitting the browser releases the lock).
+            // Exact EJS storage layout (verified in emulator.min.js):
+            // DB -> object store. The probe MUST create any missing store if
+            // it happens to create the database, otherwise EJS would open a
+            // store-less database and every transaction would fail.
+            // kantasu_roms_db matches the launcher's schema (store 'games',
+            // keyPath 'id', launcher upgrades to version 3 itself).
+            var EJS_STORES = {
+                'EmulatorJS-core': { store: 'core' },
+                'EmulatorJS-roms': { store: 'rom' },
+                'EmulatorJS-bios': { store: 'bios' },
+                'EmulatorJS-states': { store: 'states' },
+                '/data/saves': { store: 'FILE_DATA' },      // emscripten IDBFS
+                'kantasu_roms_db': { store: 'games', opts: { keyPath: 'id' } }
+            };
+            function probeDb(name, timeoutMs) {
+                return new Promise(function (resolve) {
+                    var settled = false;
+                    var timer = setTimeout(function () {
+                        if (!settled) { settled = true; resolve('blocked'); }
+                    }, timeoutMs);
+                    try {
+                        var rq = indexedDB.open(name);
+                        rq.onupgradeneeded = function (e) {
+                            // Only fires when creating the DB. Recreate the
+                            // exact store EJS/IDBFS expects so a probe-created
+                            // database is indistinguishable from EJS's own.
+                            try {
+                                var db = e.target.result;
+                                var spec = EJS_STORES[name];
+                                if (spec && spec.store && !db.objectStoreNames.contains(spec.store)) {
+                                    db.createObjectStore(spec.store, spec.opts);
+                                }
+                            } catch (err) {}
+                        };
+                        rq.onsuccess = function (e) {
+                            if (settled) return;
+                            settled = true; clearTimeout(timer);
+                            try { e.target.result.close(); } catch (err) {}
+                            resolve('ok');
+                        };
+                        rq.onerror = function () {
+                            if (settled) return;
+                            settled = true; clearTimeout(timer);
+                            resolve('error');
+                        };
+                    } catch (e) {
+                        if (!settled) { settled = true; clearTimeout(timer); resolve('error'); }
+                    }
+                });
+            }
+            function forceDeleteDb(name, timeoutMs) {
+                return new Promise(function (resolve) {
+                    var settled = false;
+                    var timer = setTimeout(function () {
+                        if (!settled) { settled = true; resolve('still-blocked'); }
+                    }, timeoutMs);
+                    try {
+                        var rq = indexedDB.deleteDatabase(name);
+                        rq.onsuccess = function () {
+                            if (settled) return;
+                            settled = true; clearTimeout(timer); resolve('repaired');
+                        };
+                        rq.onerror = rq.onblocked = function () { /* wait for the timeout */ };
+                    } catch (e) {
+                        if (!settled) { settled = true; clearTimeout(timer); resolve('still-blocked'); }
+                    }
+                });
+            }
+            // Caches re-download automatically -> auto-repairable. User data
+            // (uploaded games, saves, save states) -> never auto-deleted.
+            var REPAIRABLE = ['EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
+            var ALL_DBS = Object.keys(EJS_STORES);
+            var probeResults = await Promise.all(ALL_DBS.map(function (n) { return probeDb(n, 4000); }));
+            var blockedDbs = ALL_DBS.filter(function (n, i) { return probeResults[i] === 'blocked'; });
+            if (blockedDbs.length) {
+                var repairable = blockedDbs.filter(function (n) { return REPAIRABLE.indexOf(n) !== -1; });
+                var dataBlocked = blockedDbs.filter(function (n) { return REPAIRABLE.indexOf(n) === -1; });
+                var unrepairable = [];
+                if (repairable.length) {
+                    var repairs = await Promise.all(repairable.map(function (n) { return forceDeleteDb(n, 5000); }));
+                    unrepairable = repairable.filter(function (n, i) { return repairs[i] !== 'repaired'; });
+                }
+                if (unrepairable.length || dataBlocked.length) {
+                    // Storage is locked and cannot be fixed from inside this
+                    // page. Tell the player exactly what to do.
+                    showStoragePanel(unrepairable.concat(dataBlocked), dataBlocked.length > 0);
+                    return;
+                }
+            }
+
             if (userGameId) {
                 try {
                     await openDB();
@@ -128,7 +276,8 @@
             // its outcome (bounded) so the correct core build is chosen on the
             // first attempt instead of downloading the single-threaded core
             // and then getting reloaded into the threaded one.
-            if (window.COI_DONE) {
+            // Skipped entirely in safe mode - recovery reloads stay clean.
+            if (window.COI_DONE && params.get('safe') !== '1') {
                 try {
                     await Promise.race([
                         window.COI_DONE,
@@ -282,7 +431,18 @@
             // without COEP support, or SW failure) this evaluates to false and
             // the normal single-threaded core is used - never breaks, just
             // falls back.
-            window.EJS_threads = (window.crossOriginIsolated === true);
+            //
+            // SAFE MODE (?safe=1 or the boot watchdog panel): forces the
+            // single-threaded core even when isolation is available. Covers
+            // environments where worker/SAB/COI itself is the thing that's
+            // broken (over-aggressive extensions, odd browser builds). Sticks
+            // in localStorage until disabled from the boot panel.
+            var SAFE = false;
+            try {
+                SAFE = (params.get('safe') === '1') ||
+                       (params.get('safe') !== '0' && localStorage.getItem('kantasu_safe_mode') === '1');
+            } catch (e) {}
+            window.EJS_threads = !SAFE && (window.crossOriginIsolated === true);
 
             // ===== STATUS BADGES (fps + threading diagnostics) =====
             // The fps badge polls the emulator's real frame counter once per
@@ -293,9 +453,137 @@
             var threadBadge = document.getElementById('thread-badge');
             var fpsBadge = document.getElementById('fps-badge');
             if (threadBadge) {
-                threadBadge.textContent = window.EJS_threads ? 'MT' : 'ST';
+                threadBadge.textContent = window.EJS_threads ? 'MT' : (SAFE ? 'ST (safe)' : 'ST');
                 threadBadge.className = 'status-badge ' + (window.EJS_threads ? 'ok' : 'warn');
             }
+
+            // ===== BOOT WATCHDOG + ERROR CAPTURE =====
+            // Games should start in well under 45 seconds even on a cold
+            // cache (core 1.5MB + ROM up to ~64MB on GitHub Pages CDN). If a
+            // game silently stalls - broken worker/COI environment, poisoned
+            // IndexedDB cache, network hiccup - nothing tells the player why.
+            // This watchdog surfaces the stall, shows exactly WHERE boot is
+            // stuck plus any captured console errors, and offers one-click
+            // recovery: Safe Mode (single-threaded core) or a cache reset.
+            var bootErrors = [];
+            window.addEventListener('error', function (e) {
+                if (bootErrors.length < 8) bootErrors.push(
+                    (e && e.message ? e.message : 'Script error') +
+                    (e && e.lineno ? ' (line ' + e.lineno + ')' : ''));
+            });
+            window.addEventListener('unhandledrejection', function (e) {
+                if (bootErrors.length < 8) bootErrors.push('Promise: ' +
+                    (e && e.reason && e.reason.message ? e.reason.message : String(e && e.reason || 'rejection')));
+            });
+            var bootStart = Date.now();
+            var bootPanelShown = false;
+            function showBootPanel() {
+                if (bootPanelShown) return;
+                bootPanelShown = true;
+                var panel = document.getElementById('boot-panel');
+                if (!panel) return;
+                // Reflect the emulator's own loading phase ("Download Game
+                // Core 42%", "Loading...", stuck blank, etc.)
+                var phaseText = '';
+                try {
+                    var g = document.getElementById('game');
+                    if (g) phaseText = (g.innerText || '').trim().split('\n')[0].substring(0, 120);
+                } catch (e) {}
+                var phaseEl = document.getElementById('boot-phase');
+                if (phaseEl) phaseEl.textContent = phaseText || 'Loading\u2026 (no visible progress)';
+                // Show captured errors, if any
+                var errEl = document.getElementById('boot-errors');
+                if (errEl && bootErrors.length) {
+                    errEl.style.display = 'block';
+                    errEl.textContent = bootErrors.join('\n');
+                }
+                // In safe mode already -> adapt the copy + offer to leave it
+                var title = document.getElementById('boot-title');
+                var desc = document.getElementById('boot-desc');
+                var safeBtn = document.getElementById('boot-safe');
+                if (SAFE && title && desc && safeBtn) {
+                    title.textContent = 'This game still will not load';
+                    desc.textContent = 'Safe Mode (single-threaded) is already active. If the game still does not start, clearing the emulator cache forces a clean re-download of the core and ROM data. Your saves are not touched.';
+                    safeBtn.style.display = 'none';
+                }
+                panel.style.display = 'flex';
+                // Wire the recovery buttons
+                var safeAction = document.getElementById('boot-safe');
+                if (safeAction) safeAction.onclick = function () {
+                    try { localStorage.setItem('kantasu_safe_mode', '1'); } catch (e) {}
+                    location.reload();
+                };
+                var clearAction = document.getElementById('boot-clear');
+                if (clearAction) clearAction.onclick = function () {
+                    // Delete ONLY the core + rom download caches. Save data
+                    // (/data/saves IDBFS) and save states are other databases
+                    // and are never touched.
+                    ['EmulatorJS-core', 'EmulatorJS-roms'].forEach(function (name) {
+                        try { indexedDB.deleteDatabase(name); } catch (e) {}
+                    });
+                    location.reload();
+                };
+                var waitAction = document.getElementById('boot-wait');
+                if (waitAction) waitAction.onclick = function () {
+                    bootPanelShown = false;
+                    panel.style.display = 'none';
+                    // Re-arm the watchdog with a longer fuse (2 min)
+                    bootStart = Date.now() - (120000 - 90000);
+                };
+            }
+            // Storage-lock panel: the emulator's IndexedDB is stuck (usually
+            // after a crash / force-close during a save or download). This
+            // cannot be repaired from inside the page - but fully closing the
+            // browser releases the lock (verified). Say exactly that.
+            function showStoragePanel(stuckDbs, savesAtRisk) {
+                var panel = document.getElementById('boot-panel');
+                if (!panel) { alert('The emulator storage is locked. Fully close your browser (all windows) and reopen this page.'); return; }
+                var title = document.getElementById('boot-title');
+                var desc = document.getElementById('boot-desc');
+                var phase = document.getElementById('boot-phase');
+                if (title) title.textContent = 'Emulator storage is locked';
+                if (desc) desc.textContent =
+                    'A previous session was interrupted while writing to the emulator\u2019s storage, and the browser kept it locked. ' +
+                    'To fix it: fully QUIT the browser (all windows, not just this tab), then reopen this page \u2014 the lock releases and games load again. ' +
+                    (savesAtRisk
+                        ? 'The save-data database is affected. Your saves are not lost \u2014 after restarting, if saves do not appear, use the site\u2019s Manage tab to re-import them.'
+                        : 'Your saves are safe \u2014 only the re-downloadable core/ROM caches were affected.');
+                if (phase) phase.textContent = 'Locked: ' + (stuckDbs.length ? stuckDbs.join(', ') : '/data/saves');
+                var safeBtn = document.getElementById('boot-safe');
+                if (safeBtn) safeBtn.style.display = 'none';
+                var waitBtn = document.getElementById('boot-wait');
+                if (waitBtn) waitBtn.style.display = 'none';
+                var clearBtn = document.getElementById('boot-clear');
+                if (clearBtn) {
+                    clearBtn.textContent = 'I Restarted \u2014 Retry Now';
+                    clearBtn.className = 'primary';
+                    clearBtn.onclick = function () { location.reload(); };
+                }
+                panel.style.display = 'flex';
+            }
+
+            // Debug handle - also lets anyone inspect boot state from console
+            window.KANTASU_BOOT = {
+                errors: bootErrors,
+                showPanel: showBootPanel,
+                showStoragePanel: showStoragePanel,
+                probeDb: probeDb,
+                forceDeleteDb: forceDeleteDb,
+                started: function () {
+                    try { return !!(window.EJS_emulator && EJS_emulator.started); } catch (e) { return false; }
+                },
+                safe: SAFE
+            };
+            var bootTimer = setInterval(function () {
+                var started = false;
+                try { started = window.EJS_emulator && EJS_emulator.started; } catch (e) { started = false; }
+                if (started) { clearInterval(bootTimer); return; }
+                if (Date.now() - bootStart > 45000) {
+                    clearInterval(bootTimer);
+                    showBootPanel();
+                }
+            }, 2000);
+
             window.EJS_ready = function () {
                 // Confirm multithreading against the real heap (not just config).
                 // Module.HEAPU8 may not exist yet at the exact 'ready' moment,
