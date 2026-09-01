@@ -38,6 +38,12 @@
     <div id="game-container">
         <div id="game"></div>
     </div>
+    <!-- coi-sw.js: enables crossOriginIsolated (SharedArrayBuffer) via a service
+         worker that injects COOP/COEP headers on GitHub Pages. EmulatorJS then
+         runs its threaded core (EJS_threads), moving emulation off the main
+         thread - the single biggest lag fix. Reloads the page once on the very
+         first visit, then the flag in sessionStorage stops further reloads. -->
+    <script src="coi-sw.js"></script>
     <script type="text/javascript">
         // ===== INDEXEDDB (for user-uploaded ROMs) =====
         const DB_NAME = 'kantasu_roms_db';
@@ -107,6 +113,21 @@
             }
 
             document.getElementById('game-name').textContent = gameName;
+
+            // ===== CROSS-ORIGIN ISOLATION READINESS =====
+            // coi-sw.js (loaded in <head>) is attempting to enable isolation
+            // (service worker injecting COOP/COEP headers + one reload). Await
+            // its outcome (bounded) so the correct core build is chosen on the
+            // first attempt instead of downloading the single-threaded core
+            // and then getting reloaded into the threaded one.
+            if (window.COI_DONE) {
+                try {
+                    await Promise.race([
+                        window.COI_DONE,
+                        new Promise((resolve) => setTimeout(resolve, 3000))
+                    ]);
+                } catch (e) { /* never block gameplay on this */ }
+            }
 
             // Determine game type for custom controls
             var gameLower = gameName.toLowerCase();
@@ -241,6 +262,20 @@
             EJS_disableAutoLang = true;
             EJS_language = 'en-US';
 
+            // ===== THREADED EMULATION (the big one) =====
+            // coi-sw.js (loaded above) makes this page cross-origin isolated,
+            // which unlocks SharedArrayBuffer. With EJS_threads = true,
+            // EmulatorJS loads the pthreads build of the mupen64plus_next core
+            // and the N64 emulation loop runs on a real worker thread:
+            //   - Emulation no longer freezes/stalls the browser UI
+            //   - Input, audio and rendering stop competing with the CPU core
+            //   - GlideN64 video + RSP can overlap with R4300i CPU emulation
+            // On browsers/sessions where isolation is unavailable (e.g. Safari
+            // without COEP support, or SW failure) this evaluates to false and
+            // the normal single-threaded core is used - never breaks, just
+            // falls back.
+            window.EJS_threads = (window.crossOriginIsolated === true);
+
             // ===== QUALITY MODE (Smooth / Sharp) =====
             // Smooth: native 320x240 internal resolution + no per-pixel HW
             //   lighting - 4x fewer pixels to rasterize. The fix for weak /
@@ -303,6 +338,11 @@
             EJS_defaultOptions = {
                 // CPU - fastest available core
                 'mupen64plus-cpucore': 'cached_interpreter',
+                // RSP - HLE (only + fastest option in WASM builds)
+                'mupen64plus-rsp-plugin': 'hle',
+                // GlideN64 renders on its own thread (needs the pthread core
+                // build - silently ignored by the single-threaded fallback)
+                'mupen64plus-ThreadedRenderer': 'True',
                 // Rendering (mode-dependent)
                 'mupen64plus-43screensize': SMOOTH ? '320x240' : '640x480',
                 'mupen64plus-aspect': '4:3',

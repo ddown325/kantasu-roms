@@ -190,6 +190,13 @@
         </div>
     </footer>
 
+    <!-- coi-sw.js: enables crossOriginIsolated (SharedArrayBuffer) via a service
+         worker that injects COOP/COEP headers - GitHub Pages can't send them as
+         HTTP headers. Registering here means players arrive at play.html already
+         isolated, so the threaded (EJS_threads) N64 core engages immediately
+         without a reload mid-load. Reloads once on the very first visit only. -->
+    <script src="coi-sw.js"></script>
+
     <script>
         const DB_NAME = 'kantasu_roms_db';
         const DB_VERSION = 3;
