@@ -27,6 +27,31 @@
         .status-badge.ok { border-color: rgba(76, 175, 80, 0.45); color: #66bb6a; background: rgba(76, 175, 80, 0.08); }
         .status-badge.warn { border-color: rgba(255, 152, 0, 0.45); color: #ffa726; background: rgba(255, 152, 0, 0.08); }
         .nav-right { display: flex; align-items: center; gap: 10px; }
+    /* Save-backup badge: shows the persistent save system is live */
+    #save-badge {
+        background: rgba(76, 175, 80, 0.08); border: 1px solid rgba(76, 175, 80, 0.45); color: #66bb6a;
+        padding: 3px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; letter-spacing: 1px;
+        font-family: 'Consolas', 'Menlo', monospace; white-space: nowrap; cursor: pointer;
+        transition: all .2s; user-select: none;
+    }
+    #save-badge:hover { background: rgba(76, 175, 80, 0.2); }
+    #save-badge.pending { border-color: var(--border); color: var(--text-secondary); background: rgba(255,255,255,0.04); }
+    #save-badge.saved { border-color: rgba(76, 175, 80, 0.45); color: #66bb6a; background: rgba(76, 175, 80, 0.08); }
+    #save-badge.flash { animation: saveflash 0.6s ease; }
+    @keyframes saveflash { 0% { background: rgba(76,175,80,0.45); } 100% { background: rgba(76,175,80,0.08); } }
+    #save-toast {
+        position: fixed; bottom: 18px; right: 18px; z-index: 10000;
+        background: var(--bg-secondary); border: 1px solid rgba(76, 175, 80, 0.45); color: #a5d6a7;
+        padding: 10px 16px; border-radius: 10px; font-size: 0.8rem; font-weight: 600;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; align-items: center; gap: 8px;
+    }
+    #save-toast .toast-actions { display: flex; gap: 8px; margin-left: 6px; }
+    #save-toast button {
+        background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.4); color: #66bb6a;
+        padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; cursor: pointer;
+        font-family: inherit; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    #save-toast button:hover { background: rgba(76,175,80,0.3); }
         /* Boot watchdog overlay - shown when a game fails to start */
         #boot-panel { position: fixed; inset: 0; z-index: 9999; background: rgba(13, 13, 13, 0.92); display: flex; align-items: center; justify-content: center; }
         #boot-panel .panel { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 28px; max-width: 480px; width: calc(100% - 40px); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
@@ -53,11 +78,19 @@
         <div class="nav-right">
             <span class="status-badge" id="fps-badge" title="Emulated frames per second (N64 full speed is 20-30 depending on the game)">-- fps</span>
             <span class="status-badge" id="thread-badge" title="MT = multi-threaded emulation (SharedArrayBuffer active). ST = single-threaded fallback - try Chrome/Edge or a hard refresh.">…</span>
+            <span id="save-badge" class="pending" title="Persistent save status - your in-game saves are backed up to a dedicated database every 20 seconds and on page close. Click to back up now">save: …</span>
             <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Smooth (1x)</button>
         </div>
     </div>
     <div id="game-container">
         <div id="game"></div>
+    </div>
+    <div id="save-toast">
+        <span id="save-toast-text">Save backed up</span>
+        <span class="toast-actions">
+            <button id="save-toast-export">Export .sav</button>
+            <button id="save-toast-dismiss">Dismiss</button>
+        </span>
     </div>
     <div id="boot-panel" style="display:none">
         <div class="panel">
@@ -78,6 +111,10 @@
          thread - the single biggest lag fix. Reloads the page once on the very
          first visit, then the flag in sessionStorage stops further reloads. -->
     <script src="coi-sw.js"></script>
+    <!-- saves.js: persistent save layer - mirrors in-game saves + save states
+         into a dedicated IndexedDB (kantasu_saves_db) that survives emulator
+         cache clears, IDBFS lockups, and unflushed tab closes. -->
+    <script src="saves.js"></script>
     <script type="text/javascript">
         // ===== INDEXEDDB (for user-uploaded ROMs) =====
         const DB_NAME = 'kantasu_roms_db';
@@ -406,6 +443,207 @@
                 };
             }
 
+            // ===== PERSISTENT SAVE SYSTEM (kantasu_saves_db) =====
+            // The emulator's own save pipeline (emscripten IDBFS at /data/saves)
+            // only flushes in-game saves on pause/exit. Close the tab at the
+            // wrong moment, or hit one of its storage lockups, and hours of
+            // progress silently vanish. This layer makes saves actually stick:
+            //
+            //   1. MIRROR: every core flush ("saveSaveFiles" event - pause,
+            //      exit, and our own interval) is copied into a dedicated
+            //      IndexedDB (kantasu_saves_db) that no emulator cache-clear
+            //      or IDBFS lockup can touch.
+            //   2. AUTO-BACKUP: our own 20s timer forces a core flush +
+            //      mirror, so at most ~20s of progress is ever at risk.
+            //   3. EMERGENCY FLUSH: pagehide / visibility-change / unload all
+            //      trigger one final mirror attempt.
+            //   4. RESTORE: on boot, if our copy is newer than what the
+            //      emulator's file system holds, it is injected before the
+            //      game reads it (or hot-loaded right after start).
+            //   5. Save states get the same treatment (mirror + stable key),
+            //      replacing the emulator's single unnamed slot per game.
+            var SAVE_KEY = (window.KantasuSaves && params) ? KantasuSaves.gameKeyFromParams(params) : null;
+            var SAVE_META = {
+                gameName: gameName,
+                category: (romUrl && romUrl.indexOf('og-roms') !== -1) ? 'og-roms' : 'rom-hacks'
+            };
+            var saveLastBuffer = null;   // ArrayBuffer of the last mirrored SRAM
+            var saveLastTime = 0;
+            var saveBadge = document.getElementById('save-badge');
+            var saveListenersOn = false;
+            var saveAutoTimer = null;
+
+            function saveBadgeRefresh() {
+                if (!saveBadge || !window.KantasuSaves) return;
+                if (saveLastTime) {
+                    saveBadge.textContent = 'save: ' + KantasuSaves.formatAgo(saveLastTime);
+                    saveBadge.className = 'saved';
+                } else {
+                    saveBadge.textContent = 'save: waiting';
+                    saveBadge.className = 'pending';
+                }
+            }
+            setInterval(saveBadgeRefresh, 5000);
+
+            function saveToast(msg) {
+                var t = document.getElementById('save-toast');
+                if (!t) return;
+                document.getElementById('save-toast-text').textContent = msg;
+                t.style.display = 'flex';
+                clearTimeout(t._timer);
+                t._timer = setTimeout(function () { t.style.display = 'none'; }, 4000);
+            }
+
+            function saveMirror(buf, source) {
+                if (!buf || !buf.byteLength || !SAVE_KEY || !window.KantasuSaves) return;
+                try {
+                    buf = KantasuSaves.toArrayBuffer(buf) || buf;
+                    if (KantasuSaves.buffersEqual(saveLastBuffer, buf)) {
+                        saveLastTime = Date.now(); // still fresh - cheap heartbeat
+                        return;
+                    }
+                    KantasuSaves.putSave(SAVE_KEY, SAVE_META, buf).then(function () {
+                        saveLastBuffer = buf;
+                        saveLastTime = Date.now();
+                        saveBadgeRefresh();
+                        if (saveBadge) {
+                            saveBadge.classList.remove('flash');
+                            void saveBadge.offsetWidth;
+                            saveBadge.classList.add('flash');
+                        }
+                    }).catch(function () {
+                        if (saveBadge) { saveBadge.textContent = 'save: error'; saveBadge.className = 'pending'; }
+                    });
+                } catch (e) {}
+            }
+
+            // Read the live save file out of the running core and mirror it.
+            function saveFlushAndMirror(source) {
+                try {
+                    var gm = window.EJS_emulator && EJS_emulator.gameManager;
+                    if (!gm || !SAVE_KEY) return;
+                    var data = gm.getSaveFile(false); // null until the game first writes
+                    if (data && data.length) saveMirror(KantasuSaves.toArrayBuffer(data), source);
+                } catch (e) {}
+            }
+
+            function saveNow() {
+                // Force a core -> file flush. This fires the "saveSaveFiles"
+                // event which the listener below mirrors, but ALSO mirror
+                // directly in case the event wiring had an issue.
+                try {
+                    if (window.EJS_emulator && EJS_emulator.started && EJS_emulator.gameManager) {
+                        EJS_emulator.gameManager.saveSaveFiles();
+                    }
+                } catch (e) {}
+                saveFlushAndMirror('manual');
+            }
+            if (saveBadge) saveBadge.addEventListener('click', saveNow);
+
+            // Emergency flush - fires when the tab is being hidden or closed.
+            // IndexedDB writes started in pagehide complete in all major
+            // browsers (the event loop keeps running until they settle).
+            var saveEmergencyDone = false;
+            function saveEmergencyFlush() {
+                if (saveEmergencyDone) return;
+                saveEmergencyDone = true;
+                saveNow();
+            }
+            window.addEventListener('pagehide', saveEmergencyFlush);
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'hidden') saveEmergencyFlush();
+                else saveEmergencyDone = false; // came back - re-arm
+            });
+            window.addEventListener('beforeunload', saveEmergencyFlush);
+
+            // Attach once the EmulatorJS instance exists (loader.js creates it,
+            // EJS_ready fires right after the module is constructed).
+            function attachSaveListeners() {
+                if (saveListenersOn || !window.EJS_emulator || !window.KantasuSaves) return;
+                saveListenersOn = true;
+
+                // Core flushed SRAM (pause, exit, our timer). data = Uint8Array.
+                try {
+                    EJS_emulator.on("saveSaveFiles", function (data) {
+                        if (data && data.length) saveMirror(KantasuSaves.toArrayBuffer(data), 'auto');
+                    });
+                } catch (e) {}
+
+                // Save state pressed. NOTE: attaching a listener vetoes the
+                // emulator's own handling, so we replicate its browser-storage
+                // write (keeps the built-in Load State working) AND mirror to
+                // kantasu_saves_db under a stable key.
+                try {
+                    EJS_emulator.on("saveState", function (info) {
+                        if (!info || !info.state || !SAVE_KEY) return;
+                        var state = info.state;
+                        var buf = state.buffer ? state.buffer.slice(state.byteOffset, state.byteOffset + state.byteLength) : state;
+                        // 1. replicate the built-in browser save
+                        try { EJS_emulator.storage.states.put(EJS_emulator.getBaseFileName() + ".state", state); } catch (e) {}
+                        // 2. mirror to our database (screenshot is a Blob -> dataURL for the manager UI)
+                        var shotPromise = Promise.resolve(null);
+                        if (info.screenshot && info.screenshot instanceof Blob) {
+                            shotPromise = new Promise(function (res) {
+                                var r = new FileReader();
+                                r.onload = function (e) { res(e.target.result); };
+                                r.onerror = function () { res(null); };
+                                r.readAsDataURL(info.screenshot);
+                            });
+                        }
+                        shotPromise.then(function (shot) {
+                            return KantasuSaves.putState(SAVE_KEY, {
+                                gameName: SAVE_META.gameName,
+                                screenshot: shot
+                            }, buf, 1);
+                        }).then(function () {
+                            saveToast('Save state saved + backed up');
+                        }).catch(function () {});
+                        // 3. if the user set save-state-location to download mode,
+                        //    preserve that behavior too
+                        try {
+                            if (EJS_emulator.getSettingValue("save-state-location") !== "browser") {
+                                var blob = new Blob([state]);
+                                var url = URL.createObjectURL(blob);
+                                var a = document.createElement('a');
+                                a.href = url;
+                                a.download = EJS_emulator.getBaseFileName() + ".state";
+                                a.click();
+                                setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+                            }
+                        } catch (e) {}
+                    });
+                } catch (e) {}
+
+                // Load state pressed - vetoed too, so we own the flow:
+                // newest state from our DB, else the emulator's browser copy,
+                // else fall back to a file picker.
+                try {
+                    EJS_emulator.on("loadState", function () {
+                        KantasuSaves.getStates(SAVE_KEY).then(async function (states) {
+                            var chosen = null;
+                            if (states && states.length) chosen = states[0].data;
+                            if (!chosen) {
+                                try {
+                                    var legacy = await EJS_emulator.storage.states.get(EJS_emulator.getBaseFileName() + ".state");
+                                    if (legacy) chosen = KantasuSaves.toArrayBuffer(legacy);
+                                } catch (e) {}
+                            }
+                            if (chosen) {
+                                try {
+                                    EJS_emulator.gameManager.loadState(new Uint8Array(chosen));
+                                    EJS_emulator.displayMessage("SAVE LOADED FROM BACKUP");
+                                } catch (e) { saveToast('Could not load state'); }
+                            } else {
+                                try {
+                                    var file = await EJS_emulator.selectFile();
+                                    if (file) EJS_emulator.gameManager.loadState(new Uint8Array(await file.arrayBuffer()));
+                                } catch (e) {}
+                            }
+                        }).catch(function () {});
+                    });
+                } catch (e) {}
+            }
+
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
             EJS_core = 'mupen64plus_next';
@@ -585,6 +823,10 @@
             }, 2000);
 
             window.EJS_ready = function () {
+                // Persistent save system: the EmulatorJS instance now exists,
+                // so all save events can be hooked.
+                attachSaveListeners();
+
                 // Confirm multithreading against the real heap (not just config).
                 // Module.HEAPU8 may not exist yet at the exact 'ready' moment,
                 // so retry briefly instead of concluding 'ST' too early.
@@ -625,6 +867,69 @@
                         lastFrame = f; lastTime = now;
                     } catch (e) {}
                 }, 1000);
+            };
+
+            // ===== GAME START: restore the newest save + start auto-backup =====
+            // Fires once the game is actually running (wired by loader.js).
+            window.EJS_onGameStart = function () {
+                attachSaveListeners();
+
+                // Restore: if kantasu_saves_db holds a copy of this game's save
+                // that is newer than (or missing from) the emulator's own
+                // /data/saves file system, inject it. Covers the exact cases
+                // where the old system lost progress: tab closed before the
+                // emulator flushed, IDBFS lockup, or a cleared/locked
+                // EmulatorJS database while ours survived.
+                if (SAVE_KEY && window.KantasuSaves) {
+                    KantasuSaves.getSave(SAVE_KEY).then(function (record) {
+                        if (!record || !record.data) return;
+                        var ours = record.data;
+                        var ourTime = record.updatedAt || 0;
+                        try {
+                            var gm = EJS_emulator.gameManager;
+                            var path = gm.getSaveFilePath();
+                            var fsHasSave = path && gm.FS.analyzePath(path).exists;
+                            var fsTime = 0, fsData = null;
+                            if (fsHasSave) {
+                                try { fsTime = new Date(gm.FS.stat(path).mtime).getTime() || 0; } catch (e) { fsTime = 0; }
+                                try { fsData = gm.FS.readFile(path); } catch (e) { fsData = null; }
+                            }
+                            var same = fsData && KantasuSaves.buffersEqual(KantasuSaves.toArrayBuffer(fsData), ours);
+                            if (!same && (!fsHasSave || ourTime >= fsTime)) {
+                                // Ours is newer (or theirs is missing) -> inject.
+                                // This is exactly what the emulator's own
+                                // "load save file" feature does at runtime:
+                                // write to the save path + reload SRAM.
+                                var dirs = path.split('/');
+                                var acc = '';
+                                for (var i = 0; i < dirs.length - 1; i++) {
+                                    if (dirs[i]) { acc += '/' + dirs[i]; if (!gm.FS.analyzePath(acc).exists) gm.FS.mkdir(acc); }
+                                }
+                                if (fsHasSave) gm.FS.unlink(path);
+                                gm.FS.writeFile(path, new Uint8Array(ours));
+                                gm.loadSaveFiles();
+                                saveLastBuffer = ours;
+                                saveLastTime = Date.now();
+                                saveBadgeRefresh();
+                                saveToast('Save data restored from backup');
+                            } else if (fsHasSave && fsData && fsTime > ourTime) {
+                                // The emulator's copy is newer (e.g. saved on a
+                                // machine where our layer wasn't active yet):
+                                // adopt it into our database.
+                                saveMirror(KantasuSaves.toArrayBuffer(fsData), 'adopt');
+                            }
+                        } catch (e) {}
+                    }).catch(function () {});
+                }
+
+                // Auto-backup: force a core flush + mirror every 20 seconds.
+                // At most ~20s of progress can ever be at risk now.
+                if (saveAutoTimer) clearInterval(saveAutoTimer);
+                saveAutoTimer = setInterval(function () {
+                    try {
+                        if (window.EJS_emulator && EJS_emulator.started) saveNow();
+                    } catch (e) {}
+                }, 20000);
             };
 
             // ===== QUALITY MODE (Smooth / Sharp) =====

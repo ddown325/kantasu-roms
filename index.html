@@ -101,6 +101,22 @@
         .btn-delete { background: transparent; border: 1px solid rgba(244,67,54,.4); color: var(--red); padding: 8px 16px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: 1px; }
         .btn-delete:hover { background: rgba(244,67,54,.15); border-color: var(--red); }
 
+        /* Save Data manager */
+        .saves-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+        .saves-hint { font-size: 0.78rem; color: var(--text-secondary); }
+        .save-item { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: var(--bg-card); }
+        .save-item .state-thumb { width: 64px; height: 48px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); background: #000; flex-shrink: 0; }
+        .save-item .info { flex: 1; min-width: 0; }
+        .save-item .info .name { font-size: 0.88rem; font-weight: 700; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .save-item .info .meta { display: flex; gap: 10px; font-size: 0.72rem; color: var(--text-secondary); flex-wrap: wrap; align-items: center; }
+        .save-item .info .meta .tag { background: rgba(147,112,219,.15); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        .save-item .info .meta .tag.state { background: rgba(76,175,80,.15); color: #66bb6a; }
+        .save-item .actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .btn-mini { background: transparent; border: 1px solid rgba(147,112,219,.4); color: var(--accent); padding: 7px 12px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all .2s; text-transform: uppercase; letter-spacing: 0.5px; font-family: inherit; }
+        .btn-mini:hover { background: rgba(147,112,219,.15); border-color: var(--accent); }
+        .btn-mini.danger { border-color: rgba(244,67,54,.4); color: var(--red); }
+        .btn-mini.danger:hover { background: rgba(244,67,54,.15); border-color: var(--red); }
+
         @media (max-width: 768px) {
             .header { padding: 0 16px; height: 50px; }
             .logo { font-size: 1.1rem; }
@@ -179,6 +195,19 @@
                     <div class="manage-list" id="manage-list"></div>
                 </div>
             </div>
+            <div class="panel" style="max-width:800px;">
+                <div class="panel-header">
+                    <h2>Save Data</h2>
+                    <p>In-game saves and save states, backed up every 20 seconds while playing - independent of the emulator's internal storage. Export to keep a copy on your PC, or import a .sav backup.</p>
+                </div>
+                <div class="panel-body">
+                    <div class="saves-toolbar">
+                        <button class="btn" id="import-save-btn" style="flex:0 0 auto;">Import .sav Backup</button>
+                        <span class="saves-hint" id="saves-summary">Loading...</span>
+                    </div>
+                    <div class="manage-list" id="saves-list"></div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -196,6 +225,9 @@
          isolated, so the threaded (EJS_threads) N64 core engages immediately
          without a reload mid-load. Reloads once on the very first visit only. -->
     <script src="coi-sw.js"></script>
+    <!-- saves.js: shared persistent-save layer - powers the Save Manager
+         below and the auto-backup/restore system in play.html -->
+    <script src="saves.js"></script>
 
     <script>
         const DB_NAME = 'kantasu_roms_db';
@@ -223,26 +255,61 @@
                 { id:'b1', title:'Super Mario 64', system:'Nintendo 64', rom:'roms/og-roms/super-mario-64.zip', cover:'icons/Super Mario 64.jpeg' },
                 { id:'b2', title:'The Legend of Zelda: Ocarina of Time', system:'Nintendo 64', rom:'roms/og-roms/ocarina-of-time.zip', cover:'icons/The Legend of Zelda - Ocarina of Time.jpeg' },
                 { id:'b3', title:"The Legend of Zelda: Majora's Mask", system:'Nintendo 64', rom:'roms/og-roms/majoras-mask.zip', cover:"icons/The Legend of Zelda - Majora's Mask.jpeg" },
-                { id:'b4', title:'Banjo-Kazooie', system:'Nintendo 64', rom:'roms/og-roms/banjo-kazooie.zip', cover:'icons/Banjo-Kazooie.jpeg' }
+                { id:'b4', title:'Banjo-Kazooie', system:'Nintendo 64', rom:'roms/og-roms/banjo-kazooie.zip', cover:'icons/Banjo-Kazooie.jpeg' },
+                { id:'b5', title:'Pokemon Stadium 2', system:'Nintendo 64', rom:'roms/og-roms/pokemon-stadium-2.zip', cover:'icons/Pokemon Stadium 2.jpg' }
             ],
             'rom-hacks': [
-                { id:'h1', title:'B3313 Unabandoned', system:'SM64 Mod', rom:'roms/rom-hacks/B3313.zip', cover:'icons/B3313.png' },
-                { id:'h2', title:'Banjo Kazooie Nostalgia 64', system:'BKJ Mod', rom:'roms/rom-hacks/Banjo Kazooie Nostalgia 64.zip', cover:'icons/Banjo Kazooie Nostalgia 64.png' },
-                { id:'h3', title:'Dream 64', system:'SM64 Mod', rom:'roms/rom-hacks/Dream 64.zip', cover:'icons/Dream 64.png' },
-                { id:'h4', title:'Mario in the Dreamscape', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Dreamscape.zip', cover:'icons/Mario in the Dreamscape.png' },
-                { id:'h5', title:'Mario in the Multiverse', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Multiverse.zip', cover:'icons/Mario in the Multiverse.jpeg' },
-                { id:'h6', title:'Mario in the Multiverse - The Dream Comet', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Multiverse - The Dream Comet.zip', cover:'icons/Mario in the Multiverse - The Dream Comet.jpeg' },
-                { id:'h7', title:'SM64 Beyond the Cursed Mirror', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Beyond the Cursed Mirror.zip', cover:'icons/SM64 Beyond the Cursed Mirror.png' },
-                { id:'h8', title:'SM64 Ocarina of Time', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Ocarina of Time.zip', cover:'icons/SM64 Ocarina of Time.png' },
-                { id:'h9', title:'SM64 Randomizer', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Randomizer.zip', cover:'icons/SM64 Randomizer.png' },
+                { id:'h1',  title:'B3313 Unabandoned', system:'SM64 Mod', rom:'roms/rom-hacks/B3313.zip', cover:'icons/B3313.png' },
+                { id:'h2',  title:'Banjo Kazooie Nostalgia 64', system:'BKJ Mod', rom:'roms/rom-hacks/Banjo Kazooie Nostalgia 64.zip', cover:'icons/Banjo Kazooie Nostalgia 64.png' },
+                { id:'h3',  title:'Dream 64', system:'SM64 Mod', rom:'roms/rom-hacks/Dream 64.zip', cover:'icons/Dream 64.png' },
+                { id:'h4',  title:'Mario in the Dreamscape', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Dreamscape.zip', cover:'icons/Mario in the Dreamscape.png' },
+                { id:'h5',  title:'Mario in the Multiverse', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Multiverse.zip', cover:'icons/Mario in the Multiverse.jpeg' },
+                { id:'h6',  title:'Mario in the Multiverse - The Dream Comet', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Multiverse - The Dream Comet.zip', cover:'icons/Mario in the Multiverse - The Dream Comet.jpeg' },
+                { id:'h7',  title:'SM64 Beyond the Cursed Mirror', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Beyond the Cursed Mirror.zip', cover:'icons/SM64 Beyond the Cursed Mirror.png' },
+                { id:'h8',  title:'SM64 Ocarina of Time', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Ocarina of Time.zip', cover:'icons/SM64 Ocarina of Time.png' },
+                { id:'h9',  title:'SM64 Randomizer', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Randomizer.zip', cover:'icons/SM64 Randomizer.png' },
                 { id:'h10', title:'SM64 The Nostalgia Trip', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 The Nostalgia Trip.zip', cover:'icons/SM64 The Nostalgia Trip.png' },
                 { id:'h11', title:'Super Mario 64 - Another Mario Adventure', system:'SM64 Mod', rom:'roms/rom-hacks/Super Mario 64 - Another Mario Adventure.zip', cover:'icons/Super Mario 64 - Another Mario Adventure.jpeg' },
                 { id:'h12', title:'Super Mario 64 Land', system:'SM64 Mod', rom:'roms/rom-hacks/Super Mario 64 Land.zip', cover:'icons/Super Mario 64 Land.png' },
                 { id:'h13', title:'Super Mario 74', system:'SM64 Mod', rom:'roms/rom-hacks/Super Mario 74.zip', cover:'icons/Super Mario 74.png' },
                 { id:'h14', title:'Super Mario Star Road', system:'SM64 Mod', rom:'roms/rom-hacks/Super Mario Star Road.zip', cover:'icons/Super Mario Star Road.png' },
-                { id:'h15', title:'The Backrooms 64', system:'SM64 Mod', rom:'roms/rom-hacks/The Backrooms 64.zip', cover:'icons/The Backrooms 64.png' }
+                { id:'h15', title:'The Backrooms 64', system:'SM64 Mod', rom:'roms/rom-hacks/The Backrooms 64.zip', cover:'icons/The Backrooms 64.png' },
+                { id:'h16', title:'B3313', system:'SM64 Mod', rom:'roms/rom-hacks/B3313 Original.zip', cover:'icons/B3313 Original.png' },
+                { id:'h17', title:'BAZR', system:'SM64 Mod', rom:'roms/rom-hacks/BAZR.zip', cover:'icons/BAZR.png' },
+                { id:'h18', title:'Beauty', system:'SM64 Mod', rom:'roms/rom-hacks/Beauty.zip', cover:'icons/Beauty.png' },
+                { id:'h19', title:'Blooming Blossoms', system:'SM64 Mod', rom:'roms/rom-hacks/Blooming Blossoms.zip', cover:'icons/Blooming Blossoms.png' },
+                { id:'h20', title:'Dadas Modelling Disaster 64', system:'SM64 Mod', rom:'roms/rom-hacks/Dadas Modelling Disaster 64.zip', cover:'icons/Dadas Modelling Disaster 64.png' },
+                { id:'h21', title:'Eureka', system:'SM64 Mod', rom:'roms/rom-hacks/Eureka.zip', cover:'icons/Eureka.png' },
+                { id:'h22', title:'Katze Stuck in the Toilet 64', system:'SM64 Mod', rom:'roms/rom-hacks/Katze Stuck in the Toilet 64.zip', cover:'icons/Katze Stuck in the Toilet 64.png' },
+                { id:'h23', title:'Mario in the Colorful Lands', system:'SM64 Mod', rom:'roms/rom-hacks/Mario in the Colorful Lands.zip', cover:'icons/Mario in the Colorful Lands.jpg' },
+                { id:'h24', title:"Mario's New Comet", system:'SM64 Mod', rom:'roms/rom-hacks/Mario\'s New Comet.zip', cover:'icons/Mario\'s New Comet.png' },
+                { id:'h25', title:'Omega Mario', system:'SM64 Mod', rom:'roms/rom-hacks/Omega Mario.zip', cover:'icons/Omega Mario.png' },
+                { id:'h26', title:'Only Up', system:'SM64 Mod', rom:'roms/rom-hacks/Only Up.zip', cover:'icons/Only Up.png' },
+                { id:'h27', title:'Peachs Fury', system:'SM64 Mod', rom:'roms/rom-hacks/Peachs Fury.zip', cover:'icons/Peachs Fury.png' },
+                { id:'h28', title:'PJSF', system:'SM64 Mod', rom:'roms/rom-hacks/PJSF.zip', cover:'icons/PJSF.png' },
+                { id:'h29', title:'Power Star Madness', system:'SM64 Mod', rom:'roms/rom-hacks/Power Star Madness.zip', cover:'icons/Power Star Madness.png' },
+                { id:'h30', title:'PPSH', system:'SM64 Mod', rom:'roms/rom-hacks/PPSH.zip', cover:'icons/PPSH.png' },
+                { id:'h31', title:'Regular Pasta', system:'SM64 Mod', rom:'roms/rom-hacks/Regular Pasta.zip', cover:'icons/Regular Pasta.png' },
+                { id:'h32', title:'SM64 Decades Later', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Decades Later.zip', cover:'icons/SM64 Decades Later.png' },
+                { id:'h33', title:'SM64 Last Impact', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Last Impact.zip', cover:'icons/SM64 Last Impact.png' },
+                { id:'h34', title:'SM64 Redux', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Redux.zip', cover:'icons/SM64 Redux.png' },
+                { id:'h35', title:'SM64 Sapphire', system:'SM64 Mod', rom:'roms/rom-hacks/SM64 Sapphire.zip', cover:'icons/SM64 Sapphire.png' },
+                { id:'h36', title:'Super Mario 64 Dog Collab', system:'SM64 Mod', rom:'roms/rom-hacks/Super Mario 64 Dog Collab.zip', cover:'icons/Super Mario 64 Dog Collab.png' },
+                { id:'h37', title:'Super Mario 64 Rogue Chaos Edition', system:'SM64 Mod', rom:'roms/rom-hacks/Super Mario 64 Rogue Chaos Edition.zip', cover:'icons/Super Mario 64 Rogue Chaos Edition.png' },
+                { id:'h38', title:'The Patchmakers Workshop', system:'SM64 Mod', rom:'roms/rom-hacks/The Patchmakers Workshop.zip', cover:'icons/The Patchmakers Workshop.jpg' },
+                { id:'h39', title:'The Yoshi Garden', system:'SM64 Mod', rom:'roms/rom-hacks/The Yoshi Garden.zip', cover:'icons/The Yoshi Garden.png' },
+                { id:'h40', title:'Through the Ages', system:'SM64 Mod', rom:'roms/rom-hacks/Through the Ages.zip', cover:'icons/Through the Ages.png' },
+                { id:'h41', title:'Universal Constellation', system:'SM64 Mod', rom:'roms/rom-hacks/Universal Constellation.zip', cover:'icons/Universal Constellation.png' }
             ]
         };
+
+        // Map rom filename -> display title (used to auto-match imported saves)
+        const ROM_TITLE_INDEX = {};
+        for (const cat of Object.keys(builtinGames)) {
+            for (const g of builtinGames[cat]) {
+                ROM_TITLE_INDEX[g.rom.split('/').pop().replace(/\.(zip|z64|n64|v64)$/i, '')] = g.title;
+            }
+        }
 
         let userGames = { 'og-roms': [], 'rom-hacks': [] };
         let selectedIndex = 0, cards = [], currentTab = 'og-roms';
@@ -309,7 +376,7 @@
             document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === tabName));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.id === tabName));
             renderGames(tabName);
-            if (tabName === 'manage') renderManageList();
+            if (tabName === 'manage') { renderManageList(); renderSavesList(); }
         }
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', () => switchTab(item.dataset.tab));
@@ -444,6 +511,123 @@
             });
         }
 
+        // ===== SAVE DATA MANAGER =====
+        // Lists every backed-up save + save state from kantasu_saves_db with
+        // export / import / delete. This is the safety net that no longer
+        // depends on the emulator's internal storage at all.
+        async function renderSavesList() {
+            const list = document.getElementById('saves-list');
+            const summary = document.getElementById('saves-summary');
+            if (!list || !window.KantasuSaves) return;
+            try {
+                const [saves, states] = await Promise.all([
+                    KantasuSaves.listSaves(),
+                    KantasuSaves.listStates()
+                ]);
+                summary.textContent = `${saves.length} game save${saves.length === 1 ? '' : 's'}, ${states.length} save state${states.length === 1 ? '' : 's'} backed up`;
+                if (saves.length === 0 && states.length === 0) {
+                    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-dim);">No backed-up saves yet. Play a game - saves back up automatically every 20 seconds.</div>';
+                    return;
+                }
+                list.innerHTML = '';
+
+                saves.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).forEach(rec => {
+                    const item = document.createElement('div');
+                    item.className = 'save-item';
+                    const title = rec.gameName || ROM_TITLE_INDEX[rec.key.replace(/^rom:/, '')] || rec.key;
+                    item.innerHTML = `
+                        <div class="info">
+                            <div class="name">${title}</div>
+                            <div class="meta">
+                                <span class="tag">Save</span>
+                                <span>${KantasuSaves.formatBytes(rec.size)}</span>
+                                <span>Backed up ${KantasuSaves.formatAgo(rec.updatedAt)}</span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn-mini" onclick="KantasuSaves.downloadRecord(KANTASU_SAVES_BY_KEY['${rec.key}'])">Export</button>
+                            <button class="btn-mini danger" onclick="deleteSaveRecord('${rec.key}')">Delete</button>
+                        </div>
+                    `;
+                    list.appendChild(item);
+                });
+
+                states.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach(rec => {
+                    const item = document.createElement('div');
+                    item.className = 'save-item';
+                    const title = rec.gameName || rec.gameKey;
+                    const thumb = rec.screenshot
+                        ? `<img class="state-thumb" src="${rec.screenshot}" alt="state screenshot">`
+                        : `<div class="state-thumb"></div>`;
+                    item.innerHTML = `
+                        ${thumb}
+                        <div class="info">
+                            <div class="name">${title}</div>
+                            <div class="meta">
+                                <span class="tag state">Save State</span>
+                                <span>${KantasuSaves.formatBytes(rec.size)}</span>
+                                <span>${new Date(rec.createdAt).toLocaleString()}</span>
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn-mini" onclick="KANTASU_SAVES_BY_KEY['${rec.key}'] ? KantasuSaves.downloadRecord(KANTASU_SAVES_BY_KEY['${rec.key}']) : null">Export</button>
+                            <button class="btn-mini danger" onclick="deleteStateRecord('${rec.key}')">Delete</button>
+                        </div>
+                    `;
+                    list.appendChild(item);
+                });
+
+                // export handler lookup
+                window.KANTASU_SAVES_BY_KEY = {};
+                for (const rec of saves) window.KANTASU_SAVES_BY_KEY[rec.key] = rec;
+                for (const rec of states) {
+                    const fileName = (rec.gameName || 'game').replace(/[^a-z0-9\-_ ]/gi, '_').trim() + '.state';
+                    rec._exportName = fileName;
+                    window.KANTASU_SAVES_BY_KEY[rec.key] = rec;
+                }
+            } catch (err) {
+                summary.textContent = 'Save storage unavailable: ' + err.message;
+            }
+        }
+
+        async function deleteSaveRecord(key) {
+            if (!confirm('Delete this game save backup? The in-game save inside the emulator is not touched - only the backup copy.')) return;
+            await KantasuSaves.deleteSave(key);
+            renderSavesList();
+        }
+        async function deleteStateRecord(key) {
+            if (!confirm('Delete this save state backup?')) return;
+            await KantasuSaves.deleteState(key);
+            renderSavesList();
+        }
+
+        // Import a .sav file: auto-matches the game by filename, otherwise asks.
+        async function importSaveFile(file) {
+            if (!file) return;
+            const baseName = file.name.replace(/\.(sav|srm)$/i, '');
+            let gameKey = 'rom:' + baseName;
+            let title = ROM_TITLE_INDEX[baseName] || baseName;
+            const known = Object.keys(ROM_TITLE_INDEX);
+            const match = known.find(k => k.toLowerCase() === baseName.toLowerCase());
+            if (match) { gameKey = 'rom:' + match; title = ROM_TITLE_INDEX[match]; }
+            else {
+                const typed = prompt('Import save for which game? (Enter the exact game title as shown in the library)', baseName);
+                if (!typed) return;
+                title = typed;
+                gameKey = 'rom:' + typed;
+            }
+            const buf = await KantasuSaves.readFileAsBuffer(file);
+            await KantasuSaves.putSave(gameKey, { gameName: title, category: 'rom-hacks', source: 'import' }, buf);
+            renderSavesList();
+        }
+        document.getElementById('import-save-btn')?.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.sav,.srm';
+            input.onchange = () => { if (input.files[0]) importSaveFile(input.files[0]); };
+            input.click();
+        });
+
         async function init() {
             // RELOAD GATE: coi-sw.js may be about to reload this page once for
             // cross-origin isolation setup. Opening IndexedDB now and having
@@ -468,6 +652,7 @@
                 userGames[g.category].push(g);
             }
             renderGames('og-roms'); renderGames('rom-hacks'); renderGames('your-games');
+            renderSavesList();
         }
         init();
     </script>
