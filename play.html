@@ -878,17 +878,25 @@
             }
 
             // ===== EMULATOR BUILD SELECTION =====
-            // Two full EmulatorJS builds ship with the site:
-            //   data-v43/  - EmulatorJS 4.3.0-pre (May 2026): redone start-game
-            //                detection + save-state reading (the two subsystems
-            //                behind the "game never loads" / frozen-resume
-            //                bugs), newer core builds. DEFAULT for every game.
-            //   data/      - EmulatorJS 4.2.3 (proven stable). Games that are
-            //                known to freeze on 4.3 (verified: Pokemon Stadium
-            //                2) or that froze at boot once on this browser are
-            //                pinned here automatically - the choice is
-            //                remembered per game, so a single freeze never
-            //                blocks a game again.
+            // The emulator itself now streams from the official EmulatorJS
+            // CDN (Cloudflare) - this repo hosts ONLY the games, icons and
+            // page code, zero emulator files:
+            //   4.3.0-pre  - https://cdn.emulatorjs.org/4.3.0-pre/data/
+            //                (redone start-game detection + save-state
+            //                reading: fixes "game never loads" / frozen
+            //                resume; newer core builds). DEFAULT for every
+            //                game.
+            //   stable     - https://cdn.emulatorjs.org/stable/data/
+            //                (= EmulatorJS 4.2.3, proven stable). Games that
+            //                are known to freeze on 4.3 (verified: Pokemon
+            //                Stadium 2) or that froze at boot once on this
+            //                browser are pinned here automatically - the
+            //                choice is remembered per game, so a single
+            //                freeze never blocks a game again.
+            // Both CDN paths are byte-identical to the builds previously
+            // shipped in-repo (data-v43/ and data/), verified file-by-file,
+            // and send Cross-Origin-Resource-Policy + CORS headers, so they
+            // load correctly even in cross-origin-isolated (threaded) mode.
             var LEGACY_FLAG_PREFIX = 'kantasu_legacy_core:';
             var LEGACY_STATIC = { 'roms/og-roms/pokemon-stadium-2.zip': 1 };
             var LEGACY_MODE = false;
@@ -901,15 +909,18 @@
                     if (SAVE_KEY && localStorage.getItem(LEGACY_FLAG_PREFIX + SAVE_KEY) === '1') LEGACY_MODE = true;
                 } catch (e) {}
             }
-            var EJS_DATA_DIR = LEGACY_MODE ? 'data/' : 'data-v43/';
+            var EJS_DATA_DIR = LEGACY_MODE
+                ? 'https://cdn.emulatorjs.org/stable/data/'
+                : 'https://cdn.emulatorjs.org/4.3.0-pre/data/';
 
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
             EJS_core = 'mupen64plus_next';
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
-            // Absolute path: the 4.3 loader resolves relative paths against
-            // the parent folder, which breaks on a root-level play.html.
+            // Absolute CDN path: the 4.3 loader resolves relative paths against
+            // the parent folder, which breaks on a root-level play.html - with
+            // an absolute https URL new URL() passes it through unchanged.
             EJS_pathtodata = new URL(EJS_DATA_DIR, document.baseURI).href;
             EJS_startOnLoaded = true;
             EJS_volume = 1;
@@ -1385,6 +1396,48 @@
                 'mupen64plus-MaxTxCacheSize': '8000',
                 'mupen64plus-EnableLegacyBlending': 'True'
             };
+
+            // ===== ICON-BURST CAPTURE (?burst=1) =====
+            // Thumbnail tooling: dense in-page frame grab right after game
+            // start (26 frames, ~350ms apart) using the emulator's own PNG
+            // screenshot API. Only active with ?burst=1 - invisible to
+            // normal players. Collected via window.__burst.
+            if (params.get('burst') === '1') {
+                (function () {
+                    var orig = window.EJS_onGameStart;
+                    window.EJS_onGameStart = function () {
+                        try { if (orig) orig.apply(this, arguments); } catch (e) {}
+                        window.__burst = [];
+                        window.__burstDone = false;
+                        (async function () {
+                            for (var n = 0; n < 30; n++) {
+                                if (window.__burstDone) return;
+                                try {
+                                    // gameManager.screenshot() resolves a
+                                    // Uint8Array (the PNG bytes), not a Blob.
+                                    var raw = await EJS_emulator.gameManager.screenshot();
+                                    if (raw && raw.byteLength) raw = new Uint8Array(raw);
+                                    var blob = new Blob([raw], { type: 'image/png' });
+                                    var b64 = await new Promise(function (r) {
+                                        var fr = new FileReader();
+                                        fr.onload = function () { r(fr.result); };
+                                        fr.onerror = function () { r(null); };
+                                        fr.readAsDataURL(blob);
+                                    });
+                                    if (b64) {
+                                        window.__burst.push({
+                                            i: n,
+                                            f: EJS_emulator.gameManager.getFrameNum(),
+                                            d: b64.substring(b64.indexOf(',') + 1)
+                                        });
+                                    }
+                                } catch (e) {}
+                                await new Promise(function (r) { setTimeout(r, 500); });
+                            }
+                        })();
+                    };
+                })();
+            }
 
             EJS_debug = false;
 
