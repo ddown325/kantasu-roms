@@ -285,6 +285,45 @@
             // (uploaded games, saves, save states) -> never auto-deleted.
             var REPAIRABLE = ['EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
             var ALL_DBS = Object.keys(EJS_STORES);
+
+            // ===== VERSION-GATED CACHE PURGE (self-healing) =====
+            // ROOT CAUSE of "no games load" (verified live): EmulatorJS keys
+            // its IndexedDB cache entries by a hash of the download URL ONLY
+            // - not by content version. When the site's emulator/core stack
+            // changes, every visitor's browser still holds blobs written by
+            // the OLD stack under the SAME keys. The new build loads those
+            // stale/corrupt blobs and dies with "Failed to start game" -
+            // permanently, for every game, on every visit (the cache never
+            // self-invalidates, and the old "Clear Cache" button missed the
+            // EmulatorJS-Cache database where the 4.3 build actually stores
+            // its data).
+            // Fix: a boot-version stamp in localStorage. When the version
+            // changes, this page deletes ALL re-downloadable cache databases
+            // (including EmulatorJS-Cache) BEFORE the emulator boots, then
+            // stamps the new version. Saves, save states, uploaded games and
+            // in-game save files are NEVER touched. Each stack change costs
+            // the visitor exactly one clean re-download of core + ROM.
+            var KANTASU_BOOT_VER = '2026-10-07-selfheal2';
+            var cacheVerOk = false;
+            try { cacheVerOk = localStorage.getItem('kantasu_boot_ver') === KANTASU_BOOT_VER; } catch (e) {}
+            if (!cacheVerOk) {
+                var PURGE_DBS = ['EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
+                try {
+                    await Promise.all(PURGE_DBS.map(function (n) { return forceDeleteDb(n, 5000); }));
+                } catch (e) {}
+                // Sweep stale pins from the broken all-CDN era (they are
+                // inert in the current build, but they clutter storage).
+                try {
+                    var legacyKeys = [];
+                    for (var ki = 0; ki < localStorage.length; ki++) {
+                        var lk = localStorage.key(ki);
+                        if (lk && lk.indexOf('kantasu_legacy_core:') === 0) legacyKeys.push(lk);
+                    }
+                    legacyKeys.forEach(function (lk) { localStorage.removeItem(lk); });
+                } catch (e) {}
+                try { localStorage.setItem('kantasu_boot_ver', KANTASU_BOOT_VER); } catch (e) {}
+            }
+
             var probeResults = await Promise.all(ALL_DBS.map(function (n) { return probeDb(n, 4000); }));
             var blockedDbs = ALL_DBS.filter(function (n, i) { return probeResults[i] === 'blocked'; });
             if (blockedDbs.length) {
@@ -1028,13 +1067,20 @@
                 };
                 var clearAction = document.getElementById('boot-clear');
                 if (clearAction) clearAction.onclick = function () {
-                    // Delete ONLY the core + rom download caches. Save data
-                    // (/data/saves IDBFS) and save states are other databases
-                    // and are never touched.
-                    ['EmulatorJS-core', 'EmulatorJS-roms'].forEach(function (name) {
-                        try { indexedDB.deleteDatabase(name); } catch (e) {}
-                    });
-                    location.reload();
+                    // Delete ALL re-downloadable caches - including
+                    // EmulatorJS-Cache (where the 4.3 build stores its
+                    // core/ROM blobs - the old button missed this one, which
+                    // is why "clear cache" did not fix broken games). Save
+                    // data (/data/saves), save states (EmulatorJS-states +
+                    // kantasu_saves_db) and uploaded games are other
+                    // databases and are never touched. Await the deletions
+                    // so the reload cannot race them.
+                    clearAction.disabled = true;
+                    clearAction.textContent = 'Clearing\u2026';
+                    var CACHE_DBS = ['EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
+                    Promise.all(CACHE_DBS.map(function (name) { return forceDeleteDb(name, 5000); }))
+                        .catch(function () {})
+                        .then(function () { location.reload(); });
                 };
                 var waitAction = document.getElementById('boot-wait');
                 if (waitAction) waitAction.onclick = function () {
@@ -1360,7 +1406,17 @@
                 // Texture handling
                 'mupen64plus-EnableTextureCache': 'True',
                 'mupen64plus-MaxTxCacheSize': '8000',
-                'mupen64plus-EnableLegacyBlending': 'True'
+                'mupen64plus-EnableLegacyBlending': 'True',
+                // Force the MODERN (WebGL2) core build. EmulatorJS 4.3 has
+                // a bug where the core-report JSON (which carries
+                // defaultWebGL2:true for mupen64plus_next) is never parsed
+                // successfully, so webgl2Enabled stays null and every
+                // visitor silently gets the slower "-legacy" (WebGL1) core
+                // build - even on WebGL2-capable browsers. Pinning the
+                // setting here restores the fast path. The player can still
+                // override it from the emulator's own settings menu (their
+                // saved choice beats this default).
+                'webgl2Enabled': 'enabled'
             };
 
             // ===== ICON-BURST CAPTURE (?burst=1) =====
