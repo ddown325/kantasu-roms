@@ -303,7 +303,7 @@
             // stamps the new version. Saves, save states, uploaded games and
             // in-game save files are NEVER touched. Each stack change costs
             // the visitor exactly one clean re-download of core + ROM.
-            var KANTASU_BOOT_VER = '2026-10-07-selfheal2';
+            var KANTASU_BOOT_VER = '2026-10-07-storage1';
             var cacheVerOk = false;
             try { cacheVerOk = localStorage.getItem('kantasu_boot_ver') === KANTASU_BOOT_VER; } catch (e) {}
             if (!cacheVerOk) {
@@ -340,6 +340,50 @@
                     showStoragePanel(unrepairable.concat(dataBlocked), dataBlocked.length > 0);
                     return;
                 }
+            }
+
+            // ===== STORAGE PRE-FLIGHT (the "1 GB install" reality check) =====
+            // The emulator doesn't run from the site: it INSTALLS itself into
+            // this site's browser storage on first boot - ~40 MB of N64 core
+            // plus the ROM (up to ~67 MB) plus decompression workspace - and
+            // caches everything in IndexedDB so later loads are instant. That
+            // cache grows with every new game played (46 games is roughly
+            // 900 MB of ROMs alone). When the origin's storage quota runs
+            // out, every cache WRITE fails, the core install aborts, and NO
+            // game ever starts - every game, every time, with no visible
+            // error. That is the "all roms don't work" symptom, and why a
+            // one-off cache purge doesn't stick (the re-download immediately
+            // re-fills the quota). So: ask for persistent storage (stops the
+            // browser evicting cores/saves under disk pressure), then verify
+            // there is actually room BEFORE booting a doomed load.
+            var STORAGE_NEEDED = 250 * 1024 * 1024; // core + ROM + workspace
+            window.__kantasu_storage = null;       // {free, usage, quota} diagnostics
+            try {
+                if (navigator.storage && navigator.storage.persist) {
+                    navigator.storage.persist().catch(function () {});
+                }
+            } catch (e) {}
+            try {
+                if (navigator.storage && navigator.storage.estimate) {
+                    var storageEst = await navigator.storage.estimate();
+                    if (storageEst && typeof storageEst.quota === 'number') {
+                        var storageUsage = typeof storageEst.usage === 'number' ? storageEst.usage : 0;
+                        window.__kantasu_storage = {
+                            quota: storageEst.quota,
+                            usage: storageUsage,
+                            free: Math.max(0, storageEst.quota - storageUsage)
+                        };
+                    }
+                }
+            } catch (e) {}
+            // Debug/diagnostic override: ?lowstorage=1 previews exactly what
+            // a quota-crunched device sees (60 MB free of a 2 GB allowance).
+            if (params.get('lowstorage') === '1') {
+                window.__kantasu_storage = { free: 60 * 1024 * 1024, quota: 2 * 1024 * 1024 * 1024, usage: 2 * 1024 * 1024 * 1024 - 60 * 1024 * 1024 };
+            }
+            if (window.__kantasu_storage && window.__kantasu_storage.free < STORAGE_NEEDED) {
+                var enoughRoom = await lowStorageChoice(window.__kantasu_storage);
+                if (!enoughRoom) return; // page is reloading (cache cleared)
             }
 
             if (userGameId) {
@@ -1024,8 +1068,31 @@
                     (e && e.lineno ? ' (line ' + e.lineno + ')' : ''));
             });
             window.addEventListener('unhandledrejection', function (e) {
-                if (bootErrors.length < 8) bootErrors.push('Promise: ' +
-                    (e && e.reason && e.reason.message ? e.reason.message : String(e && e.reason || 'rejection')));
+                var reason = (e && e.reason) || {};
+                var reasonName = reason.name || '';
+                var reasonMsg = reason.message ? reason.message : String(reason || 'rejection');
+                // Quota errors are the one failure mode that kills every
+                // game while looking like nothing happened: the emulator's
+                // cache writes just start rejecting. Catch it and surface
+                // the boot panel IMMEDIATELY instead of a 45s dead spinner.
+                if (reasonName === 'QuotaExceededError' || /quota|storage.*exceed|exceed.*storage/i.test(reasonMsg)) {
+                    window.__kantasu_quota_hit = true;
+                    try {
+                        if (navigator.storage && navigator.storage.estimate) {
+                            navigator.storage.estimate().then(function (q) {
+                                if (q && typeof q.quota === 'number') {
+                                    window.__kantasu_storage = {
+                                        quota: q.quota,
+                                        usage: q.usage || 0,
+                                        free: Math.max(0, q.quota - (q.usage || 0))
+                                    };
+                                }
+                            }).catch(function () {});
+                        }
+                    } catch (er) {}
+                    showBootPanel();
+                }
+                if (bootErrors.length < 8) bootErrors.push('Promise: ' + reasonMsg);
             });
             var bootStart = Date.now();
             var bootPanelShown = false;
@@ -1043,6 +1110,33 @@
                 } catch (e) {}
                 var phaseEl = document.getElementById('boot-phase');
                 if (phaseEl) phaseEl.textContent = phaseText || 'Loading\u2026 (no visible progress)';
+                // Real storage numbers in the panel: a screenshot from any
+                // failing device now answers "is this a storage problem?"
+                // without needing devtools.
+                function appendStorageLine() {
+                    try {
+                        var s = window.__kantasu_storage;
+                        var p = document.getElementById('boot-phase');
+                        if (s && p && p.textContent.indexOf('Storage free:') === -1) {
+                            p.textContent = p.textContent + ' | Storage free: ' + fmtMB(s.free) + ' / ' + fmtMB(s.quota);
+                        }
+                    } catch (e) {}
+                }
+                appendStorageLine();
+                try {
+                    if (!window.__kantasu_storage && navigator.storage && navigator.storage.estimate) {
+                        navigator.storage.estimate().then(function (q) {
+                            if (q && typeof q.quota === 'number') {
+                                window.__kantasu_storage = {
+                                    quota: q.quota,
+                                    usage: q.usage || 0,
+                                    free: Math.max(0, q.quota - (q.usage || 0))
+                                };
+                                appendStorageLine();
+                            }
+                        }).catch(function () {});
+                    }
+                } catch (e) {}
                 // Show captured errors, if any
                 var errEl = document.getElementById('boot-errors');
                 if (errEl && bootErrors.length) {
@@ -1057,6 +1151,21 @@
                     title.textContent = 'This game still will not load';
                     desc.textContent = 'Safe Mode (single-threaded) is already active. If the game still does not start, clearing the emulator cache forces a clean re-download of the core and ROM data. Your saves are not touched.';
                     safeBtn.style.display = 'none';
+                }
+                // Storage-exhaustion variant: a quota error was hit, or free
+                // space is below what a game install needs. Copy + primary
+                // action both point at freeing space (saves untouched).
+                if ((window.__kantasu_quota_hit ||
+                     (window.__kantasu_storage && window.__kantasu_storage.free < 250 * 1024 * 1024)) && title && desc) {
+                    title.textContent = 'Not enough browser storage';
+                    desc.textContent = 'The emulator installs its core and each game into this site\u2019s browser storage, and the quota is exhausted - so the install fails and no game can start. Free Space below clears only the re-downloadable emulator files (your saves and uploaded games are never touched) and retries.';
+                    var storageClearBtn = document.getElementById('boot-clear');
+                    if (storageClearBtn) {
+                        storageClearBtn.textContent = 'Free Space + Retry';
+                        storageClearBtn.className = 'primary';
+                    }
+                    var storageSafeBtn = document.getElementById('boot-safe');
+                    if (storageSafeBtn) storageSafeBtn.style.display = 'none';
                 }
                 panel.style.display = 'flex';
                 // Wire the recovery buttons
@@ -1090,6 +1199,58 @@
                     bootStart = Date.now() - (120000 - 90000);
                 };
             }
+            // ===== LOW-STORAGE PRE-FLIGHT PANEL =====
+            // Shown BEFORE the emulator boots, only when the site cannot
+            // verify ~250 MB of free browser storage (the real install size
+            // of core + ROM + workspace). Non-blocking choice: free the
+            // re-downloadable cache (one tap, then a clean reload) or
+            // continue with the boot anyway.
+            function fmtMB(bytes) {
+                try {
+                    var mb = (bytes || 0) / (1024 * 1024);
+                    return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.max(0, Math.round(mb)) + ' MB';
+                } catch (e) { return '?'; }
+            }
+            function lowStorageChoice(st) {
+                return new Promise(function (resolve) {
+                    var panel = document.getElementById('boot-panel');
+                    if (!panel) { resolve(true); return; }
+                    var title = document.getElementById('boot-title');
+                    var desc = document.getElementById('boot-desc');
+                    var phase = document.getElementById('boot-phase');
+                    if (title) title.textContent = 'Not enough browser storage';
+                    if (desc) desc.textContent =
+                        'Games don\u2019t stream from the site - the emulator installs its core (~40 MB) plus each game\u2019s ROM into your browser\u2019s storage for this site, and the cache grows as you play more games. ' +
+                        'This site currently has ' + fmtMB(st.free) + ' free of its ' + fmtMB(st.quota) + ' allowance, and a game needs roughly 250 MB. ' +
+                        'Tap Free Space below - it clears only re-downloadable emulator files, so your saves and uploaded games are safe.';
+                    if (phase) phase.textContent = 'Free: ' + fmtMB(st.free) + ' of ' + fmtMB(st.quota) + ' \u00b7 a game needs ~250 MB';
+                    var safeBtn = document.getElementById('boot-safe');
+                    if (safeBtn) safeBtn.style.display = 'none';
+                    var clearBtn = document.getElementById('boot-clear');
+                    if (clearBtn) {
+                        clearBtn.textContent = 'Free Space + Retry';
+                        clearBtn.className = 'primary';
+                        clearBtn.onclick = function () {
+                            clearBtn.disabled = true;
+                            clearBtn.textContent = 'Clearing\u2026';
+                            var CACHE_DBS = ['EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
+                            Promise.all(CACHE_DBS.map(function (name) { return forceDeleteDb(name, 5000); }))
+                                .catch(function () {})
+                                .then(function () { location.reload(); });
+                        };
+                    }
+                    var waitBtn = document.getElementById('boot-wait');
+                    if (waitBtn) {
+                        waitBtn.textContent = 'Continue Anyway';
+                        waitBtn.onclick = function () {
+                            panel.style.display = 'none';
+                            resolve(true); // boot anyway (if it still fails, the panel will say why)
+                        };
+                    }
+                    panel.style.display = 'flex';
+                });
+            }
+
             // Storage-lock panel: the emulator's IndexedDB is stuck (usually
             // after a crash / force-close during a save or download). This
             // cannot be repaired from inside the page - but fully closing the
@@ -1124,6 +1285,7 @@
             // Debug handle - also lets anyone inspect boot state from console
             window.KANTASU_BOOT = {
                 errors: bootErrors,
+                storage: function () { return window.__kantasu_storage; },
                 showPanel: showBootPanel,
                 showStoragePanel: showStoragePanel,
                 probeDb: probeDb,

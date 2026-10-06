@@ -212,6 +212,17 @@
                     <div class="manage-list" id="saves-list"></div>
                 </div>
             </div>
+            <div class="panel" style="max-width:800px;">
+                <div class="panel-header">
+                    <h2>Browser Storage</h2>
+                    <p>Games don't stream from this site - the emulator installs its core (~40 MB) and each game's ROM into this site's browser storage, cached for instant reloads. If that allowance fills up, no game can start. The number below is your headroom.</p>
+                </div>
+                <div class="panel-body">
+                    <div class="saves-toolbar">
+                        <span class="saves-hint" id="storage-summary">Checking...</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -402,7 +413,7 @@
             document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === tabName));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.toggle('active', content.id === tabName));
             renderGames(tabName);
-            if (tabName === 'manage') { renderManageList(); renderSavesList(); }
+            if (tabName === 'manage') { renderManageList(); renderSavesList(); renderStorageInfo(); }
         }
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', () => switchTab(item.dataset.tab));
@@ -535,6 +546,42 @@
                 `;
                 list.appendChild(item);
             });
+        }
+
+        // ===== BROWSER STORAGE READOUT =====
+        // Shows how much of this site's storage allowance is used vs free.
+        // The emulator installs core + ROM caches into that allowance; when
+        // it runs out, no game can start (that failure shows a panel inside
+        // play.html with a one-tap fix - this readout is the early warning).
+        async function renderStorageInfo() {
+            const summary = document.getElementById('storage-summary');
+            if (!summary) return;
+            try {
+                if (navigator.storage && navigator.storage.persist) {
+                    navigator.storage.persist().catch(() => {});
+                }
+                if (!navigator.storage || !navigator.storage.estimate) {
+                    summary.textContent = 'This browser does not report storage usage.';
+                    return;
+                }
+                const est = await navigator.storage.estimate();
+                if (!est || typeof est.quota !== 'number') {
+                    summary.textContent = 'This browser does not report storage usage.';
+                    return;
+                }
+                const fmtMB = (bytes) => {
+                    const mb = (bytes || 0) / (1024 * 1024);
+                    return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB';
+                };
+                const used = est.usage || 0;
+                const free = Math.max(0, est.quota - used);
+                const healthy = free >= 250 * 1024 * 1024; // a game needs ~250 MB
+                summary.innerHTML = (healthy
+                    ? `<b>${fmtMB(free)} free</b> of ${fmtMB(est.quota)} - plenty of room for games`
+                    : `<b>Only ${fmtMB(free)} free</b> of ${fmtMB(est.quota)} - a game needs ~250 MB. If games fail to start, open any game and use "Free Space + Retry".`);
+            } catch (e) {
+                summary.textContent = 'Storage check unavailable.';
+            }
         }
 
         // ===== SAVE DATA MANAGER =====
