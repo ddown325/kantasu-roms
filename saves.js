@@ -61,6 +61,15 @@
         return db.transaction([storeName], mode).objectStore(storeName);
     }
 
+    // Close the database connection and reset the open-promise so a later
+    // call re-opens it. Used by the "Delete ALL Data" factory reset in
+    // index.html (an open connection blocks deleteDatabase until reload).
+    function closeDB() {
+        openPromise = null;
+        try { if (db) db.close(); } catch (e) {}
+        db = null;
+    }
+
     function promisify(request) {
         return new Promise((resolve, reject) => {
             request.onsuccess = () => resolve(request.result);
@@ -261,6 +270,7 @@
 
     window.KantasuSaves = {
         openDB: openDB,
+        closeDB: closeDB,
         gameKeyFromParams: gameKeyFromParams,
         stateKey: stateKey,
         putSave: putSave,

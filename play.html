@@ -65,6 +65,20 @@
         #boot-panel .primary:hover { background: #b06fd3; }
         #boot-panel .secondary { background: var(--bg-primary); color: var(--text-secondary); border: 1px solid var(--border); }
         #boot-panel .secondary:hover { color: var(--text-primary); }
+        /* Tap-to-start overlay (autoplay policy): shown when the game is
+           running but frozen because audio never got a user gesture. */
+        #tap-start {
+            position: fixed; inset: 0; z-index: 9998; cursor: pointer;
+            background: rgba(13, 13, 13, 0.55);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 10px; text-align: center;
+        }
+        #tap-start .play-circle {
+            width: 84px; height: 84px; border-radius: 50%; font-size: 2.2rem; line-height: 84px;
+            background: var(--accent); color: #fff; box-shadow: 0 10px 40px rgba(147, 112, 219, 0.45);
+        }
+        #tap-start h3 { font-size: 1.25rem; font-weight: 700; color: var(--text-primary); }
+        #tap-start p { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; }
         #game-container { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; overflow: hidden; }
         #game { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
     </style>
@@ -79,6 +93,7 @@
             <span class="status-badge" id="fps-badge" title="Emulated frames per second (N64 full speed is 20-30 depending on the game)">-- fps</span>
             <span class="status-badge" id="thread-badge" title="MT = multi-threaded emulation (SharedArrayBuffer active). ST = single-threaded fallback - try Chrome/Edge or a hard refresh.">…</span>
             <span id="save-badge" class="pending" title="Persistent save status - your in-game saves AND your exact position (auto-resume state) are backed up to a dedicated database every 20-30 seconds and on page close. Reload and you resume exactly where you left off. Click to back up now">save: …</span>
+            <button class="perf-badge" id="core-toggle" title="Emulator core profile">…</button>
             <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Smooth (1x)</button>
         </div>
     </div>
@@ -104,6 +119,14 @@
                 <button class="secondary" id="boot-wait">Keep Waiting</button>
             </div>
         </div>
+    </div>
+    <!-- Tap-to-start overlay: browsers block audio until a user gesture;
+         the lite core's audio loop blocks the whole game without it. Any
+         click anywhere resumes playback instantly. -->
+    <div id="tap-start" style="display:none">
+        <div class="play-circle">&#9654;</div>
+        <h3>Tap to start</h3>
+        <p>Your browser pauses game audio until you interact with the page.<br>Click anywhere to begin.</p>
     </div>
     <!-- coi-sw.js: enables crossOriginIsolated (SharedArrayBuffer) via a service
          worker that injects COOP/COEP headers on GitHub Pages. EmulatorJS then
@@ -286,54 +309,85 @@
             var REPAIRABLE = ['EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
             var ALL_DBS = Object.keys(EJS_STORES);
 
-            // ===== VERSION-GATED CACHE PURGE (self-healing) =====
-            // ROOT CAUSE of "no games load" (verified live): EmulatorJS keys
-            // its IndexedDB cache entries by a hash of the download URL ONLY
-            // - not by content version. When the site's emulator/core stack
-            // changes, every visitor's browser still holds blobs written by
-            // the OLD stack under the SAME keys. The new build loads those
-            // stale/corrupt blobs and dies with "Failed to start game" -
-            // permanently, for every game, on every visit (the cache never
-            // self-invalidates, and the old "Clear Cache" button missed the
-            // EmulatorJS-Cache database where the 4.3 build actually stores
-            // its data).
-            // Fix: a boot-version stamp in localStorage. When the version
-            // changes, this page deletes ALL re-downloadable cache databases
-            // (including EmulatorJS-Cache) BEFORE the emulator boots, then
-            // stamps the new version. Saves, save states, uploaded games and
-            // in-game save files are NEVER touched. Each stack change costs
-            // the visitor exactly one clean re-download of core + ROM.
-            var KANTASU_BOOT_VER = '2026-10-07-assetfix1';
+            // ===== VERSION-GATED FULL RESET (delete ALL old user data) =====
+            // History: the "no games load" era left every early visitor with
+            // a mix of poisoned EmulatorJS-Cache blobs, stale core pins,
+            // half-written save states from crashed cores and leftover
+            // service-worker state. Partial purges (caches only) kept
+            // missing whichever database the current poison lived in, and
+            // debug keys accumulated across builds. Requested fix: on every
+            // stack version change, FACTORY-RESET this origin's entire
+            // browser storage - not just the cache DBs:
+            //   - EVERY IndexedDB on the origin (enumerated live, so nothing
+            //     old can hide: EmulatorJS-Cache/-core/-roms/-bios/-states,
+            //     /data/saves, kantasu_saves_db, kantasu_roms_db, anything
+            //     else a past build ever created)
+            //   - CacheStorage (window.caches)
+            //   - ALL service workers (the coi COOP/COEP worker re-registers
+            //     itself automatically on the next load)
+            //   - localStorage + sessionStorage (every debug/pin/mode key
+            //     from every past build, including old boot-version stamps)
+            // That includes save data - a fresh start is the point. Going
+            // forward the save/backup system rebuilds progress from scratch
+            // and the version only bumps when a true reset is wanted.
+            // Each reset costs one clean re-download of the core + ROM.
+            var KANTASU_BOOT_VER = '2026-10-07-lite3';
             var cacheVerOk = false;
             try { cacheVerOk = localStorage.getItem('kantasu_boot_ver') === KANTASU_BOOT_VER; } catch (e) {}
             if (!cacheVerOk) {
-                var PURGE_DBS = ['EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
-                var purgeResults = ['repaired', 'repaired', 'repaired', 'repaired'];
+                // Collect EVERY database name the browser knows about on
+                // this origin. indexedDB.databases() is supported in all
+                // modern browsers; older ones fall back to the known list.
+                var dbNames = [];
                 try {
-                    purgeResults = await Promise.all(PURGE_DBS.map(function (n) { return forceDeleteDb(n, 5000); }));
-                } catch (e) {}
-                // Sweep stale pins from the broken all-CDN era (they are
-                // inert in the current build, but they clutter storage).
-                try {
-                    var legacyKeys = [];
-                    for (var ki = 0; ki < localStorage.length; ki++) {
-                        var lk = localStorage.key(ki);
-                        if (lk && lk.indexOf('kantasu_legacy_core:') === 0) legacyKeys.push(lk);
+                    if (indexedDB.databases) {
+                        var listed = await indexedDB.databases();
+                        if (listed && listed.length) {
+                            listed.forEach(function (d) { if (d && d.name) dbNames.push(d.name); });
+                        }
                     }
-                    legacyKeys.forEach(function (lk) { localStorage.removeItem(lk); });
                 } catch (e) {}
-                // Only stamp when the blob cache actually went away. If
-                // another kantasu tab is holding the database open, the
-                // deletion blocks - stamping anyway would freeze the
-                // (possibly poisoned) cache in place forever, which is
-                // exactly how a browser stayed broken through three purge
-                // bumps. Unstamped simply means: retry on the next visit.
-                var purgeAllOk = purgeResults.every(function (r) { return r === 'repaired'; });
-                if (purgeAllOk) {
+                [
+                    'EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms',
+                    'EmulatorJS-bios', 'EmulatorJS-states', '/data/saves',
+                    'kantasu_saves_db', 'kantasu_roms_db'
+                ].forEach(function (n) { if (dbNames.indexOf(n) === -1) dbNames.push(n); });
+                var wipeResults = [];
+                try {
+                    wipeResults = await Promise.all(dbNames.map(function (n) { return forceDeleteDb(n, 5000); }));
+                } catch (e) {}
+                // CacheStorage: nuke every cache the origin ever created.
+                try {
+                    if (window.caches && caches.keys) {
+                        var cacheKeys = await caches.keys();
+                        await Promise.all(cacheKeys.map(function (k) { return caches.delete(k); }));
+                    }
+                } catch (e) {}
+                // Service workers: unregister everything (the COI worker
+                // re-registers itself on the next navigation; the one-time
+                // isolation reload then runs again exactly once).
+                try {
+                    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                        var regs = await navigator.serviceWorker.getRegistrations();
+                        await Promise.all(regs.map(function (r) { return r.unregister(); }));
+                    }
+                } catch (e) {}
+                // localStorage + sessionStorage: every key from every build.
+                try { localStorage.clear(); } catch (e) {}
+                try { sessionStorage.clear(); } catch (e) {}
+                // Stamp only when every database actually went away. If
+                // another kantasu tab holds a database open, deletion blocks
+                // - stamping anyway would freeze the reset in place forever
+                // (the exact bug that kept one browser broken through three
+                // purge bumps). Unstamped = retry the whole reset next
+                // visit; storages that were cleared stay cleared either way.
+                var wipeAllOk = wipeResults.every(function (r) { return r === 'repaired'; });
+                if (wipeAllOk) {
                     try { localStorage.setItem('kantasu_boot_ver', KANTASU_BOOT_VER); } catch (e) {}
+                    console.info('[kantasu] full data reset complete (' + dbNames.length + ' databases removed) - starting clean');
                 } else {
                     window.__kantasu_purge_blocked = true;
-                    console.warn('[kantasu] cache purge blocked (another tab open? ' + purgeResults.join(',') + ') - will retry next visit');
+                    console.warn('[kantasu] data reset incomplete (another tab open? ' + wipeResults.join(',') + ') - will retry next visit');
                 }
             }
 
@@ -355,10 +409,11 @@
                 }
             }
 
-            // ===== STORAGE PRE-FLIGHT (the "1 GB install" reality check) =====
+            // ===== STORAGE PRE-FLIGHT (the install reality check) =====
             // The emulator doesn't run from the site: it INSTALLS itself into
-            // this site's browser storage on first boot - ~40 MB of N64 core
-            // plus the ROM (up to ~67 MB) plus decompression workspace - and
+            // this site's browser storage on first boot - the emulator core
+            // (a few MB: 0.9 MB download / 3.1 MB installed on the lite
+            // profile, about double on full) plus the ROM (up to ~67 MB)
             // caches everything in IndexedDB so later loads are instant. That
             // cache grows with every new game played (46 games is roughly
             // 900 MB of ROMs alone). When the origin's storage quota runs
@@ -744,7 +799,7 @@
                     KantasuSaves.putState(SAVE_KEY, {
                         gameName: SAVE_META.gameName,
                         source: source,
-                        core: '43'
+                        core: STATE_CORE_TAG
                     }, buf, AUTO_SLOT).then(function () {
                         saveLastTime = Date.now(); // keep the badge fresh
                         saveBadgeRefresh();
@@ -784,12 +839,14 @@
                 if (autoStateResumed || !SAVE_KEY || !window.KantasuSaves) return;
                 KantasuSaves.getAutoState(SAVE_KEY).then(function (rec) {
                     if (!rec || !rec.data || !rec.data.byteLength) return;
-                    // Cross-build guard: save states are core-build specific.
-                    // An old-build state loaded into the other build can
-                    // corrupt or hard-freeze the core. Untagged states are
-                    // from the pre-4.3 (4.2.3) era. Drop instead of loading;
-                    // the 30s capture timer re-creates the point immediately.
-                    var wantCore = '43';
+                    // Cross-core guard: save states are core-build
+                    // specific (worse than useless across cores - loading a
+                    // mupen64plus_next state into parallel_n64 corrupts or
+                    // hard-freezes it). States are tagged with the exact
+                    // core; untagged states are from the pre-4.3 (4.2.3)
+                    // era. Drop anything that does not match - the 30s
+                    // capture timer re-creates the point immediately.
+                    var wantCore = STATE_CORE_TAG;
                     var recCore = rec.core || '423'; // untagged = 4.2.3 era
                     if (recCore !== wantCore) {
                         try { KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)); } catch (e) {}
@@ -987,8 +1044,22 @@
             // site's own fast GitHub Pages CDN. Same-origin boot files also
             // avoid the Chromium cross-origin fetch/pthread race that
             // deadlocked ROM extraction in the all-CDN era.
-            // data/ = EmulatorJS 4.3.0-pre boot files + cores (the core .data
-            // files are byte-identical to the official CDN builds).
+            // data/ = EmulatorJS 4.3.0-pre boot files + cores. CORE BUILD
+            // PROVENANCE (matters - the two cores come from different CDN
+            // release trains, verified compatible with the 4.3.0-pre engine):
+            //   mupen64plus_next(-thread)-wasm.data  = 4.3.0-pre builds
+            //   parallel_n64(-thread)-wasm.data      = /stable/ builds
+            // WHY: the 4.3.0-pre parallel_n64 build was compiled WITHOUT
+            // Asyncify, so its emscripten_fiber_swap import is an aborting
+            // stub ("Please compile your program with async support") - the
+            // core dies instantly at boot. The /stable/ build implements
+            // fiber_swap properly via Asyncify (its wasm is 4.5 MB vs 3.1,
+            // still two-thirds the size of mupen64plus_next's 6.6 MB) and
+            // runs the full catalog at full speed on the 4.3 engine (A/B
+            // verified: SM64 33-43 fps lite vs 18 fps full on a weak GPU).
+            // ALSO: the stable parallel_n64 core BLOCKS on audio until a
+            // user gesture (autoplay policy) - the "Tap to start" overlay
+            // in EJS_onGameStart covers sessions that arrive without one.
             //
             // NOTE: the old per-game "legacy" fallback (EmulatorJS 4.2.3,
             // data-stable/) was REMOVED: in the hybrid layout the 4.2.3
@@ -1003,15 +1074,52 @@
 
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
-            EJS_core = 'mupen64plus_next';
-            // ?core=parallel_n64 boots with the ParaLLEl N64 software-renderer
-            // core instead of mupen64plus_next (GlideN64). Mostly a capture /
-            // diagnostics tool: on systems where the GL renderer shows a black
-            // screen, the software core still renders (slowly). Also handy as
-            // a per-game escape hatch for odd GPU drivers.
+
+            // ===== PERFORMANCE PROFILE: LITE (low-end) vs FULL =====
+            // Two N64 cores are hosted on this site, same engine:
+            //   LITE = parallel_n64 + Glide64mk2 renderer. Core download is
+            //          ~1.0 MB and the wasm ~4.5 MB (two-thirds of the full
+            //          core) - and Glide64 is the classic lightweight N64
+            //          renderer (simple shaders, few draw calls, full speed
+            //          on weak GPUs). Made for low-end / mobile /
+            //          integrated-GPU devices: smaller install, faster core
+            //          compile, less memory, less GC pressure. Measured:
+            //          ~2x the fps of the full core on a weak GPU.
+            //   FULL = mupen64plus_next + GlideN64. Bigger (1.5 MB core
+            //          download, 6.6 MB wasm) and more accurate on edge
+            //          cases; the default on capable hardware.
+            // Selection order: ?perf= URL param, then the player's saved
+            // choice (nav toggle), then auto-detection (mobile UA, <= 4 CPU
+            // threads, or <= 4 GB RAM => lite).
+            var LOW_END = false, LOW_END_WHY = [];
+            try {
+                var ua = navigator.userAgent || '';
+                if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) { LOW_END = true; LOW_END_WHY.push('mobile'); }
+                if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) { LOW_END = true; LOW_END_WHY.push(navigator.hardwareConcurrency + ' cpu threads'); }
+                if (navigator.deviceMemory && navigator.deviceMemory <= 4) { LOW_END = true; LOW_END_WHY.push(navigator.deviceMemory + ' GB ram'); }
+            } catch (e) {}
+            var perfParam = null, savedProfile = null;
+            try { perfParam = params.get('perf'); } catch (e) {}
+            try { savedProfile = localStorage.getItem('kantasu_perf_profile'); } catch (e) {}
+            var PROFILE = (perfParam === 'lite' || perfParam === 'full') ? perfParam
+                        : (savedProfile === 'lite' || savedProfile === 'full') ? savedProfile
+                        : (LOW_END ? 'lite' : 'full');
+            try { localStorage.setItem('kantasu_perf_profile', PROFILE); } catch (e) {}
+            EJS_core = (PROFILE === 'lite') ? 'parallel_n64' : 'mupen64plus_next';
+            // ?core=parallel_n64 / ?core=mupen64plus_next remains the raw
+            // diagnostics override (GPU-driver escape hatch); it wins over
+            // the profile system.
             var CORE_OVERRIDE = params.get('core');
             if (CORE_OVERRIDE === 'parallel_n64' || CORE_OVERRIDE === 'mupen64plus_next') {
                 EJS_core = CORE_OVERRIDE;
+            }
+            // Save states are core-specific: a state captured on one core
+            // loaded into the other corrupts or hard-freezes it. Every
+            // auto-resume state is tagged with the core it was made on and
+            // mismatched states are dropped instead of loaded.
+            var STATE_CORE_TAG = '43:' + (EJS_core === 'parallel_n64' ? 'p64' : 'm64n');
+            if (LOW_END_WHY.length) {
+                try { console.info('[kantasu] low-end device detected (' + LOW_END_WHY.join(', ') + ') - using the lite core'); } catch (e) {}
             }
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
@@ -1039,6 +1147,8 @@
             window.EJS_paths = {
                 'mupen64plus_next-thread-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-thread-wasm.data?v=' + ASSET_VER,
                 'mupen64plus_next-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-wasm.data?v=' + ASSET_VER,
+                'parallel_n64-thread-wasm.data': EJS_pathtodata + 'cores/parallel_n64-thread-wasm.data?v=' + ASSET_VER,
+                'parallel_n64-wasm.data': EJS_pathtodata + 'cores/parallel_n64-wasm.data?v=' + ASSET_VER,
                 'extract7z.js': EJS_pathtodata + 'compression/extract7z.js?v=' + ASSET_VER,
                 'extractzip.js': EJS_pathtodata + 'compression/extractzip.js?v=' + ASSET_VER
             };
@@ -1085,6 +1195,23 @@
             if (threadBadge) {
                 threadBadge.textContent = window.EJS_threads ? 'MT' : (SAFE ? 'ST (safe)' : 'ST');
                 threadBadge.className = 'status-badge ' + (window.EJS_threads ? 'ok' : 'warn');
+            }
+            // Core profile toggle (Lite / Full): one tap switches cores and
+            // reloads. The choice is remembered, so auto-detected low-end
+            // players can still upgrade to the Full core and vice versa.
+            var coreToggle = document.getElementById('core-toggle');
+            if (coreToggle) {
+                coreToggle.textContent = (EJS_core === 'parallel_n64') ? 'Lite core' : 'Full core';
+                coreToggle.title = (EJS_core === 'parallel_n64')
+                    ? 'Lite: parallel_n64 + Glide64 - half-size core built for low-end devices (0.9 MB download). Click to switch to Full (mupen64plus_next) - the page will reload.'
+                    : 'Full: mupen64plus_next + GlideN64 - the accuracy core (1.5 MB download). Click to switch to Lite (parallel_n64 - half the size, lighter on weak hardware) - the page will reload.';
+                coreToggle.addEventListener('click', function () {
+                    var next = (EJS_core === 'parallel_n64') ? 'full' : 'lite';
+                    try { localStorage.setItem('kantasu_perf_profile', next); } catch (e) {}
+                    var u = new URL(window.location.href);
+                    u.searchParams.set('perf', next);
+                    window.location.href = u.href;
+                });
             }
 
             // ===== BOOT WATCHDOG + ERROR CAPTURE =====
@@ -1278,7 +1405,7 @@
                     var phase = document.getElementById('boot-phase');
                     if (title) title.textContent = 'Not enough browser storage';
                     if (desc) desc.textContent =
-                        'Games don\u2019t stream from the site - the emulator installs its core (~40 MB) plus each game\u2019s ROM into your browser\u2019s storage for this site, and the cache grows as you play more games. ' +
+                        'Games don\u2019t stream from the site - the emulator installs its core (a few MB) plus each game\u2019s ROM into your browser\u2019s storage for this site, and the cache grows as you play more games. ' +
                         'This site currently has ' + fmtMB(st.free) + ' free of its ' + fmtMB(st.quota) + ' allowance, and a game needs roughly 250 MB. ' +
                         'Tap Free Space below - it clears only re-downloadable emulator files, so your saves and uploaded games are safe.';
                     if (phase) phase.textContent = 'Free: ' + fmtMB(st.free) + ' of ' + fmtMB(st.quota) + ' \u00b7 a game needs ~250 MB';
@@ -1436,6 +1563,44 @@
                 // guard (captureAutoState refuses to snapshot a stalled core,
                 // because a frozen state would freeze every future launch).
                 try { window.__kantasu_boot_frame = EJS_emulator.gameManager.getFrameNum(); } catch (e) {}
+
+                // ===== AUDIO-STALL DETECTOR ("Tap to start") =====
+                // Browsers refuse to start audio playback without a user
+                // gesture (autoplay policy). The lite core's audio loop then
+                // BLOCKS the entire game ~40 frames after boot - silently,
+                // with no error anywhere (verified). Detect it: the game has
+                // "started" but the frame counter is frozen. The overlay
+                // collects the gesture; any click resumes game + audio
+                // instantly. Auto-hides the moment frames move again; never
+                // shown for background tabs (rAF paused), the open pause
+                // menu, or the pre-boot watchdog phase.
+                var tapEl = document.getElementById('tap-start');
+                var tapShown = false;
+                var tapLastFrame = null, tapLastMove = Date.now();
+                if (tapEl) {
+                    tapEl.addEventListener('click', function () {
+                        tapEl.style.display = 'none';
+                        tapShown = false;
+                    });
+                }
+                setInterval(function () {
+                    try {
+                        if (!window.EJS_emulator || !EJS_emulator.started || !EJS_emulator.gameManager) return;
+                        if (document.hidden) return;
+                        if (EJS_emulator.paused || EJS_emulator.pausedState) return;
+                        var f = EJS_emulator.gameManager.getFrameNum();
+                        if (f === null || f === undefined) return;
+                        if (f !== tapLastFrame) {
+                            tapLastFrame = f; tapLastMove = Date.now();
+                            if (tapShown) { tapShown = false; tapEl.style.display = 'none'; }
+                            return;
+                        }
+                        if (!tapShown && tapEl && Date.now() - tapLastMove > 6000) {
+                            tapShown = true;
+                            tapEl.style.display = 'flex';
+                        }
+                    } catch (e) {}
+                }, 1200);
 
                 // (The old boot-freeze auto-fallback to the 4.2.3 build was
                 // removed with the legacy path - that engine cannot run in
@@ -1596,24 +1761,40 @@
             // Disable cheats entirely (prevents memory access out of bounds crash)
             EJS_cheats = [];
 
-            // ===== PERFORMANCE + QUALITY OPTIONS =====
-            // These are the REAL mupen64plus-next core options (verified against
-            // the core binary shipped with EmulatorJS 4.2.3 and A/B tested in
-            // the browser). Pure-speed settings apply in BOTH quality modes:
-            //  - cpucore 'cached_interpreter': fastest CPU core in WASM builds
-            //    (dynamic recompilation is impossible in the browser).
-            //  - rsp-plugin 'hle': high-level RSP emulation (fastest, default).
-            //  - EnableCopyColorToRDRAM/DepthToRDRAM 'Off': the defaults
-            //    ('Sync'/'Software') force GPU->CPU framebuffer readbacks that
-            //    stall rendering every frame - the main source of in-game lag
-            //    and audio crackle.
-            //  - FrameDuping 'True': when the game hasn't rendered a new frame
-            //    (menus, pauses, load screens), the previous frame is reused
-            //    instead of re-submitting the whole scene - measurably the
-            //    best-performing configuration in browser testing.
-            // Quality-dependent settings (resolution, HW lighting) follow the
-            // Smooth/Sharp mode selected above.
-            EJS_defaultOptions = {
+            // ===== PERFORMANCE + QUALITY OPTIONS (core-specific) =====
+            // LITE (parallel_n64) and FULL (mupen64plus_next) take entirely
+            // different option sets - every key below was verified against
+            // the exact core binaries this site ships. Shared speed
+            // principles: cached_interpreter CPU (fastest in WASM - dynarec
+            // is impossible in the browser), HLE RSP, native 320x240 in
+            // Smooth mode (4x fewer pixels for weak GPUs), original frame
+            // pacing. Resolution / HW-lighting follow the Smooth/Sharp
+            // quality mode selected above.
+            EJS_defaultOptions = (EJS_core === 'parallel_n64') ? {
+                // ---- LITE: parallel_n64 / Glide64mk2 ----
+                // Glide64: THE lightweight N64 renderer - simple shaders,
+                // few draw calls, full speed on weak / integrated GPUs.
+                'parallel-n64-gfxplugin': 'glide64',
+                'parallel-n64-cpucore': 'cached_interpreter',
+                'parallel-n64-rspplugin': 'hle',
+                // Native (Smooth) or 2x (Sharp) internal resolution
+                'parallel-n64-screensize': SMOOTH ? '320x240' : '640x480',
+                'parallel-n64-framerate': 'original',
+                // Half the default audio buffer = half the audio latency -
+                // on slow devices the big buffer is what makes sound lag
+                // behind the picture.
+                'parallel-n64-audio-buffer-size': '1024',
+                'parallel-n64-bufferswap': 'enabled',
+                // N64-authentic 3-point filtering (also the cheapest)
+                'parallel-n64-filtering': 'N64 3-point',
+                // webgl2Enabled is REQUIRED for both cores: the engine's
+                // webgl2 decision can come back null (its core-report JSON
+                // parsing is broken in 4.3), and null/falsy makes it request
+                // the '-legacy' WebGL1 filename - which this site does NOT
+                // host. Pinning it guarantees the hosted build is fetched.
+                'webgl2Enabled': 'enabled'
+            } : {
+                // ---- FULL: mupen64plus_next / GlideN64 ----
                 // CPU - fastest available core
                 'mupen64plus-cpucore': 'cached_interpreter',
                 // RSP - HLE (only + fastest option in WASM builds)

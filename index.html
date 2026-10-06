@@ -215,12 +215,14 @@
             <div class="panel" style="max-width:800px;">
                 <div class="panel-header">
                     <h2>Browser Storage</h2>
-                    <p>Games don't stream from this site - the emulator installs its core (~40 MB) and each game's ROM into this site's browser storage, cached for instant reloads. If that allowance fills up, no game can start. The number below is your headroom.</p>
+                    <p>Games don't stream from this site - the emulator installs its core (a few MB) and each game's ROM into this site's browser storage, cached for instant reloads. If that allowance fills up, no game can start. The number below is your headroom.</p>
                 </div>
                 <div class="panel-body">
                     <div class="saves-toolbar">
                         <span class="saves-hint" id="storage-summary">Checking...</span>
+                        <button class="btn" id="wipe-all-btn" style="flex:0 0 auto;">Delete ALL Data</button>
                     </div>
+                    <p style="font-size:0.72rem;color:var(--text-dim);margin:10px 0 0;">Delete ALL Data wipes everything this site has ever stored on your device: cached games and emulator cores, in-game saves and save states, and uploaded ROMs. Nothing can be recovered. Use it to fix a stubbornly broken browser or to start fresh.</p>
                 </div>
             </div>
         </div>
@@ -548,6 +550,57 @@
             });
         }
 
+        // ===== DELETE ALL DATA (factory reset of this origin) =====
+        // The same routine the version-gated reset in play.html runs: every
+        // IndexedDB, CacheStorage, every service worker, localStorage and
+        // sessionStorage. Double confirmation because saves are included.
+        function wireWipeAll() {
+            const btn = document.getElementById('wipe-all-btn');
+            if (!btn || btn.dataset.wired) return;
+            btn.dataset.wired = '1';
+            btn.addEventListener('click', async function () {
+                if (!confirm('Delete EVERYTHING this site has stored in your browser?\n\nThis includes: cached games and emulator cores, in-game saves and save states, and uploaded ROMs. Nothing can be recovered.')) return;
+                if (!confirm('Last check - your saves and uploaded games will be gone for good. Continue?')) return;
+                btn.disabled = true;
+                btn.textContent = 'Deleting...';
+                // Close this page's own open database connections first,
+                // otherwise the deletions below block until reload.
+                try { if (db) db.close(); } catch (e) {}
+                try { if (window.KantasuSaves && KantasuSaves.closeDB) KantasuSaves.closeDB(); } catch (e) {}
+                const delDb = (name) => new Promise((res) => {
+                    let done = false;
+                    const t = setTimeout(() => { if (!done) { done = true; res(); } }, 4000);
+                    try {
+                        const rq = indexedDB.deleteDatabase(name);
+                        rq.onsuccess = rq.onerror = rq.onblocked = () => { if (!done) { done = true; clearTimeout(t); res(); } };
+                    } catch (e) { if (!done) { done = true; clearTimeout(t); res(); } }
+                });
+                try {
+                    let names = ['EmulatorJS-Cache','EmulatorJS-core','EmulatorJS-roms','EmulatorJS-bios','EmulatorJS-states','/data/saves','kantasu_saves_db','kantasu_roms_db'];
+                    if (indexedDB.databases) {
+                        const listed = await indexedDB.databases();
+                        (listed || []).forEach(d => { if (d && d.name && names.indexOf(d.name) === -1) names.push(d.name); });
+                    }
+                    await Promise.all(names.map(delDb));
+                } catch (e) {}
+                try {
+                    if (window.caches && caches.keys) {
+                        const keys = await caches.keys();
+                        await Promise.all(keys.map(k => caches.delete(k)));
+                    }
+                } catch (e) {}
+                try {
+                    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+                        const regs = await navigator.serviceWorker.getRegistrations();
+                        await Promise.all(regs.map(r => r.unregister()));
+                    }
+                } catch (e) {}
+                try { localStorage.clear(); } catch (e) {}
+                try { sessionStorage.clear(); } catch (e) {}
+                location.reload();
+            });
+        }
+
         // ===== BROWSER STORAGE READOUT =====
         // Shows how much of this site's storage allowance is used vs free.
         // The emulator installs core + ROM caches into that allowance; when
@@ -556,6 +609,7 @@
         async function renderStorageInfo() {
             const summary = document.getElementById('storage-summary');
             if (!summary) return;
+            wireWipeAll();
             try {
                 if (navigator.storage && navigator.storage.persist) {
                     navigator.storage.persist().catch(() => {});
