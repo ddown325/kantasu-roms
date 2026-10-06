@@ -303,7 +303,7 @@
             // stamps the new version. Saves, save states, uploaded games and
             // in-game save files are NEVER touched. Each stack change costs
             // the visitor exactly one clean re-download of core + ROM.
-            var KANTASU_BOOT_VER = '2026-10-07-storage1';
+            var KANTASU_BOOT_VER = '2026-10-07-core-local';
             var cacheVerOk = false;
             try { cacheVerOk = localStorage.getItem('kantasu_boot_ver') === KANTASU_BOOT_VER; } catch (e) {}
             if (!cacheVerOk) {
@@ -961,23 +961,21 @@
             }
 
             // ===== EMULATOR BUILD SELECTION =====
-            // HYBRID layout (fix for "no games load"): the ~1MB of emulator
-            // BOOT files (loader.js, emulator.min.js/css, zip/7z extractors)
-            // ship same-origin with the site, while the heavy N64 CORES
-            // stream on demand from the official EmulatorJS CDN. Reason: with
-            // every engine file cross-origin, Chromium hits a fetch/stream
-            // timing race against the pthread core spin-up - ROM zip
-            // extraction deadlocks silently and NO game ever boots (verified
-            // 4/4 hangs all-CDN vs 3/3 boots same-origin). Same-origin boot
-            // files eliminate the race; the repo still hosts ZERO core bytes
-            // (the emulator's built-in failsafe pulls cores from
-            // cdn.emulatorjs.org/<version>/data/cores/ when the local path
-            // has none - verified live).
-            // data/ = EmulatorJS 4.3.0-pre boot files (sha256-verified
-            // byte-identical to the CDN). Redone start-game detection +
-            // save-state reading - the two subsystems behind the old "game
-            // never loads" / frozen-resume bugs. Verified working BOTH
-            // threaded (MT, ~21fps) and single-threaded (safe mode).
+            // FULLY LOCAL: the ~1MB of emulator BOOT files (loader.js,
+            // emulator.min.js/css, zip/7z extractors) AND both N64 core
+            // builds (mupen64plus_next thread + single-thread, ~3MB total
+            // 7z-packed) all ship same-origin with the site. Games no longer
+            // depend on cdn.emulatorjs.org AT ALL: the previous local-404 ->
+            // CDN-fallback core path was the last network dependency that
+            // could silently kill every game (blocked/slow CDN = stuck
+            // "Downloading..." forever). The 4.3 engine's built-in CDN
+            // fallback remains as a safety net if a local file is somehow
+            // missing, but normal boots now fetch everything from this
+            // site's own fast GitHub Pages CDN. Same-origin boot files also
+            // avoid the Chromium cross-origin fetch/pthread race that
+            // deadlocked ROM extraction in the all-CDN era.
+            // data/ = EmulatorJS 4.3.0-pre boot files + cores (the core .data
+            // files are byte-identical to the official CDN builds).
             //
             // NOTE: the old per-game "legacy" fallback (EmulatorJS 4.2.3,
             // data-stable/) was REMOVED: in the hybrid layout the 4.2.3
