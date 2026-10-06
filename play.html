@@ -916,6 +916,15 @@
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
             EJS_core = 'mupen64plus_next';
+            // ?core=parallel_n64 boots with the ParaLLEl N64 software-renderer
+            // core instead of mupen64plus_next (GlideN64). Mostly a capture /
+            // diagnostics tool: on systems where the GL renderer shows a black
+            // screen, the software core still renders (slowly). Also handy as
+            // a per-game escape hatch for odd GPU drivers.
+            var CORE_OVERRIDE = params.get('core');
+            if (CORE_OVERRIDE === 'parallel_n64' || CORE_OVERRIDE === 'mupen64plus_next') {
+                EJS_core = CORE_OVERRIDE;
+            }
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
             // Absolute CDN path: the 4.3 loader resolves relative paths against
