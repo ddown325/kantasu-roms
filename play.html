@@ -648,7 +648,7 @@
                     KantasuSaves.putState(SAVE_KEY, {
                         gameName: SAVE_META.gameName,
                         source: source,
-                        core: LEGACY_MODE ? '423' : '43'
+                        core: '43'
                     }, buf, AUTO_SLOT).then(function () {
                         saveLastTime = Date.now(); // keep the badge fresh
                         saveBadgeRefresh();
@@ -693,7 +693,7 @@
                     // corrupt or hard-freeze the core. Untagged states are
                     // from the pre-4.3 (4.2.3) era. Drop instead of loading;
                     // the 30s capture timer re-creates the point immediately.
-                    var wantCore = LEGACY_MODE ? '423' : '43';
+                    var wantCore = '43';
                     var recCore = rec.core || '423'; // untagged = 4.2.3 era
                     if (recCore !== wantCore) {
                         try { KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)); } catch (e) {}
@@ -878,40 +878,34 @@
             }
 
             // ===== EMULATOR BUILD SELECTION =====
-            // The emulator itself now streams from the official EmulatorJS
-            // CDN (Cloudflare) - this repo hosts ONLY the games, icons and
-            // page code, zero emulator files:
-            //   4.3.0-pre  - https://cdn.emulatorjs.org/4.3.0-pre/data/
-            //                (redone start-game detection + save-state
-            //                reading: fixes "game never loads" / frozen
-            //                resume; newer core builds). DEFAULT for every
-            //                game.
-            //   stable     - https://cdn.emulatorjs.org/stable/data/
-            //                (= EmulatorJS 4.2.3, proven stable). Games that
-            //                are known to freeze on 4.3 (verified: Pokemon
-            //                Stadium 2) or that froze at boot once on this
-            //                browser are pinned here automatically - the
-            //                choice is remembered per game, so a single
-            //                freeze never blocks a game again.
-            // Both CDN paths are byte-identical to the builds previously
-            // shipped in-repo (data-v43/ and data/), verified file-by-file,
-            // and send Cross-Origin-Resource-Policy + CORS headers, so they
-            // load correctly even in cross-origin-isolated (threaded) mode.
-            var LEGACY_FLAG_PREFIX = 'kantasu_legacy_core:';
-            var LEGACY_STATIC = { 'roms/og-roms/pokemon-stadium-2.zip': 1 };
-            var LEGACY_MODE = false;
-            if (params.get('legacy') === '1') {
-                LEGACY_MODE = true;
-            } else if (LEGACY_STATIC[params.get('rom') || '']) {
-                LEGACY_MODE = true;
-            } else {
-                try {
-                    if (SAVE_KEY && localStorage.getItem(LEGACY_FLAG_PREFIX + SAVE_KEY) === '1') LEGACY_MODE = true;
-                } catch (e) {}
-            }
-            var EJS_DATA_DIR = LEGACY_MODE
-                ? 'https://cdn.emulatorjs.org/stable/data/'
-                : 'https://cdn.emulatorjs.org/4.3.0-pre/data/';
+            // HYBRID layout (fix for "no games load"): the ~1MB of emulator
+            // BOOT files (loader.js, emulator.min.js/css, zip/7z extractors)
+            // ship same-origin with the site, while the heavy N64 CORES
+            // stream on demand from the official EmulatorJS CDN. Reason: with
+            // every engine file cross-origin, Chromium hits a fetch/stream
+            // timing race against the pthread core spin-up - ROM zip
+            // extraction deadlocks silently and NO game ever boots (verified
+            // 4/4 hangs all-CDN vs 3/3 boots same-origin). Same-origin boot
+            // files eliminate the race; the repo still hosts ZERO core bytes
+            // (the emulator's built-in failsafe pulls cores from
+            // cdn.emulatorjs.org/<version>/data/cores/ when the local path
+            // has none - verified live).
+            // data/ = EmulatorJS 4.3.0-pre boot files (sha256-verified
+            // byte-identical to the CDN). Redone start-game detection +
+            // save-state reading - the two subsystems behind the old "game
+            // never loads" / frozen-resume bugs. Verified working BOTH
+            // threaded (MT, ~21fps) and single-threaded (safe mode).
+            //
+            // NOTE: the old per-game "legacy" fallback (EmulatorJS 4.2.3,
+            // data-stable/) was REMOVED: in the hybrid layout the 4.2.3
+            // engine never advances past boot (frozen black screen, 0 fps,
+            // both MT and ST - verified on multiple games), and stale
+            // legacy pins from the broken all-CDN era were routing most
+            // games into that dead path - the actual "no games load". All
+            // games now boot on the 4.3 engine; the ?legacy=1 URL param is
+            // accepted but ignored. Old 'kantasu_legacy_core:*' localStorage
+            // pins are inert.
+            var EJS_DATA_DIR = 'data/';
 
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
@@ -1098,27 +1092,10 @@
                 try { started = window.EJS_emulator && EJS_emulator.started; } catch (e) { started = false; }
                 if (started) { clearInterval(bootTimer); return; }
                 var elapsed = Date.now() - bootStart;
-                // 30s with no start on the NEW (4.3) build: some ROMs crash
-                // the newer core at boot ("memory access out of bounds" -
-                // verified with Dream 64 / B3313 Original). The game never
-                // starts, so the in-start freeze detector cannot run. Fall
-                // back to the proven 4.2.3 build automatically, once per
-                // game (the flag makes it permanent - no loop possible).
-                if (!LEGACY_MODE && elapsed > 30000 && !window.__kantasu_legacy_retry) {
-                    // Still downloading a big ROM/CDN core is NOT a crash -
-                    // only switch when the load phase is past downloading.
-                    var phaseText = '';
-                    try { var gEl = document.getElementById('game'); if (gEl) phaseText = (gEl.innerText || '').trim().toLowerCase(); } catch (e) {}
-                    if (phaseText.indexOf('download') === -1) {
-                        window.__kantasu_legacy_retry = 1;
-                        clearInterval(bootTimer);
-                        try { if (SAVE_KEY) localStorage.setItem(LEGACY_FLAG_PREFIX + SAVE_KEY, '1'); } catch (e) {}
-                        var u = new URL(window.location.href);
-                        u.searchParams.set('legacy', '1');
-                        location.replace(u.href);
-                        return;
-                    }
-                }
+                // (The old 30s auto-switch to the 4.2.3 build was removed -
+                // see the build-selection note above: that path is dead in
+                // the hybrid layout. Recovery for a stalled boot is the boot
+                // panel below: Safe Mode / Clear Cache + retry.)
                 if (elapsed > 45000) {
                     clearInterval(bootTimer);
                     showBootPanel();
@@ -1181,30 +1158,10 @@
                 // because a frozen state would freeze every future launch).
                 try { window.__kantasu_boot_frame = EJS_emulator.gameManager.getFrameNum(); } catch (e) {}
 
-                // ===== BOOT-FREEZE AUTO-FALLBACK =====
-                // On the new (4.3) build only: if the core produces ZERO
-                // frames for 15 straight seconds after start, it is frozen
-                // (seen with some ROMs on the new core build). Remember the
-                // game and reload once on the proven 4.2.3 build - the flag
-                // makes the switch permanent per game, so this can never
-                // loop. Frozen cores on the legacy build are left to the
-                // boot watchdog panel instead.
-                if (!LEGACY_MODE) {
-                    var ffBase = null, ffChecks = 0;
-                    (function bootFreezeDetector() {
-                        if (window.__kantasu_suppress_freeze_detect) return;
-                        var f = null;
-                        try { f = EJS_emulator.gameManager.getFrameNum(); } catch (e) {}
-                        if (f === null || f === undefined) { setTimeout(bootFreezeDetector, 3000); return; }
-                        if (ffBase === null) { ffBase = f; setTimeout(bootFreezeDetector, 15000); return; }
-                        if (f > ffBase) return; // core is running - all good
-                        if (++ffChecks > 2) return; // verify twice, then stop
-                        try { if (SAVE_KEY) localStorage.setItem(LEGACY_FLAG_PREFIX + SAVE_KEY, '1'); } catch (e) {}
-                        var u = new URL(window.location.href);
-                        u.searchParams.set('legacy', '1');
-                        location.replace(u.href);
-                    })();
-                }
+                // (The old boot-freeze auto-fallback to the 4.2.3 build was
+                // removed with the legacy path - that engine cannot run in
+                // the hybrid layout. The 45s boot watchdog panel remains the
+                // recovery UI for a genuinely stalled boot.)
 
                 // "Start Fresh" flow: ?fresh=1 means do NOT auto-resume.
                 // Delete the stored auto state (so this session's 30s timer
