@@ -303,13 +303,14 @@
             // stamps the new version. Saves, save states, uploaded games and
             // in-game save files are NEVER touched. Each stack change costs
             // the visitor exactly one clean re-download of core + ROM.
-            var KANTASU_BOOT_VER = '2026-10-07-core-local';
+            var KANTASU_BOOT_VER = '2026-10-07-assetfix1';
             var cacheVerOk = false;
             try { cacheVerOk = localStorage.getItem('kantasu_boot_ver') === KANTASU_BOOT_VER; } catch (e) {}
             if (!cacheVerOk) {
                 var PURGE_DBS = ['EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms', 'EmulatorJS-bios'];
+                var purgeResults = ['repaired', 'repaired', 'repaired', 'repaired'];
                 try {
-                    await Promise.all(PURGE_DBS.map(function (n) { return forceDeleteDb(n, 5000); }));
+                    purgeResults = await Promise.all(PURGE_DBS.map(function (n) { return forceDeleteDb(n, 5000); }));
                 } catch (e) {}
                 // Sweep stale pins from the broken all-CDN era (they are
                 // inert in the current build, but they clutter storage).
@@ -321,7 +322,19 @@
                     }
                     legacyKeys.forEach(function (lk) { localStorage.removeItem(lk); });
                 } catch (e) {}
-                try { localStorage.setItem('kantasu_boot_ver', KANTASU_BOOT_VER); } catch (e) {}
+                // Only stamp when the blob cache actually went away. If
+                // another kantasu tab is holding the database open, the
+                // deletion blocks - stamping anyway would freeze the
+                // (possibly poisoned) cache in place forever, which is
+                // exactly how a browser stayed broken through three purge
+                // bumps. Unstamped simply means: retry on the next visit.
+                var purgeAllOk = purgeResults.every(function (r) { return r === 'repaired'; });
+                if (purgeAllOk) {
+                    try { localStorage.setItem('kantasu_boot_ver', KANTASU_BOOT_VER); } catch (e) {}
+                } else {
+                    window.__kantasu_purge_blocked = true;
+                    console.warn('[kantasu] cache purge blocked (another tab open? ' + purgeResults.join(',') + ') - will retry next visit');
+                }
             }
 
             var probeResults = await Promise.all(ALL_DBS.map(function (n) { return probeDb(n, 4000); }));
@@ -1006,6 +1019,29 @@
             // the parent folder, which breaks on a root-level play.html - with
             // an absolute https URL new URL() passes it through unchanged.
             EJS_pathtodata = new URL(EJS_DATA_DIR, document.baseURI).href;
+
+            // ===== ASSET CACHE-BUSTING (the wasm/glue mismatch killer) =====
+            // EmulatorJS 4.3 caches downloaded cores in IndexedDB and looks
+            // them up by URL. Core builds are NOT interchangeable: the CDN
+            // serves a different mupen64plus_next build under /stable/ than
+            // under /4.3.0-pre/, and a browser holding a cached build can
+            // end up pairing one build's .wasm with another build's .js
+            // glue - the core then dies at the pthread entry point with
+            // "RuntimeError: function signature mismatch" and the game
+            // never installs (reproduced and confirmed). A URL that has
+            // never been requested before can NEVER hit a stale cache
+            // entry, so every core/extractor URL gets the site version
+            // appended. EJS_paths is the engine's filePaths config: it
+            // overrides the download URL, keyed by FILENAME only (the ROM
+            // and the CDN-failsafe URLs bypass it - verified in engine
+            // source). Verified working flow: cores + extractors only.
+            var ASSET_VER = encodeURIComponent(KANTASU_BOOT_VER);
+            window.EJS_paths = {
+                'mupen64plus_next-thread-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-thread-wasm.data?v=' + ASSET_VER,
+                'mupen64plus_next-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-wasm.data?v=' + ASSET_VER,
+                'extract7z.js': EJS_pathtodata + 'compression/extract7z.js?v=' + ASSET_VER,
+                'extractzip.js': EJS_pathtodata + 'compression/extractzip.js?v=' + ASSET_VER
+            };
             EJS_startOnLoaded = true;
             EJS_volume = 1;
             EJS_AdUrl = '';
@@ -1060,10 +1096,33 @@
             // stuck plus any captured console errors, and offers one-click
             // recovery: Safe Mode (single-threaded core) or a cache reset.
             var bootErrors = [];
+            // ===== CORE-CRASH SELF-HEAL =====
+            // If a poisoned cached core still slips through (mixed-build
+            // wasm/glue), the failure is unmistakable: "function signature
+            // mismatch", WebAssembly LinkError, or an aborted instantiate
+            // during boot. Instead of leaving the player on a dead spinner,
+            // purge the blob cache once and reload - the version-busted
+            // URLs then force a guaranteed-fresh, self-consistent core.
+            var coreCrashHealed = false;
+            try { coreCrashHealed = sessionStorage.getItem('kantasu_core_selfheal') === '1'; } catch (e) {}
+            function maybeCoreCrashSelfHeal(msg, force) {
+                if (coreCrashHealed || !msg) return;
+                if (window.EJS_emulator && window.EJS_emulator.started) return; // mid-game: don't nuke a session
+                if (!force && !/function signature mismatch|LinkError|WebAssembly\.(instantiate|compile)|Aborted\(RuntimeError|Import\[.*\] mismatch/i.test(String(msg))) return;
+                coreCrashHealed = true;
+                try { sessionStorage.setItem('kantasu_core_selfheal', '1'); } catch (e) {}
+                console.warn('[kantasu] core crash class detected ("' + String(msg).slice(0, 120) + '") - purging emulator cache and reloading once');
+                (async function () {
+                    try { await forceDeleteDb('EmulatorJS-Cache', 4000); } catch (e) {}
+                    try { await forceDeleteDb('EmulatorJS-core', 2000); } catch (e) {}
+                    location.reload();
+                })();
+            }
             window.addEventListener('error', function (e) {
                 if (bootErrors.length < 8) bootErrors.push(
                     (e && e.message ? e.message : 'Script error') +
                     (e && e.lineno ? ' (line ' + e.lineno + ')' : ''));
+                maybeCoreCrashSelfHeal(e && e.message);
             });
             window.addEventListener('unhandledrejection', function (e) {
                 var reason = (e && e.reason) || {};
@@ -1091,6 +1150,7 @@
                     showBootPanel();
                 }
                 if (bootErrors.length < 8) bootErrors.push('Promise: ' + reasonMsg);
+                maybeCoreCrashSelfHeal(reasonMsg);
             });
             var bootStart = Date.now();
             var bootPanelShown = false;
@@ -1298,6 +1358,19 @@
                 try { started = window.EJS_emulator && EJS_emulator.started; } catch (e) { started = false; }
                 if (started) { clearInterval(bootTimer); return; }
                 var elapsed = Date.now() - bootStart;
+                // Engine-surfaced boot failures: the engine CATCHES the actual
+                // crash internally (wasm LinkError / function signature
+                // mismatch / aborted instantiate) and only shows localized
+                // text in the game container - no window error event ever
+                // fires. Poll that text and route it into the core-crash
+                // self-heal (purge + one reload).
+                try {
+                    var gEl = document.getElementById('game');
+                    var gTxt = gEl ? (gEl.innerText || '') : '';
+                    if (/failed to start game|error downloading core|network error/i.test(gTxt)) {
+                        maybeCoreCrashSelfHeal('Engine boot failure: ' + gTxt.trim().slice(0, 90), true);
+                    }
+                } catch (e) {}
                 // (The old 30s auto-switch to the 4.2.3 build was removed -
                 // see the build-selection note above: that path is dead in
                 // the hybrid layout. Recovery for a stalled boot is the boot
