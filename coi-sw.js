@@ -70,14 +70,32 @@ else {
     // forever -> "game never loads"). This gate prevents that class of bug.
     // COI_RELOADING === true means: this page WILL be replaced by a reload in
     // a moment - do not start anything that must not be interrupted.
+    //
+    // LOOP-GUARD: the "already reloaded" marker is kept in sessionStorage AND
+    // in window.name. sessionStorage throws (blocked cookies / storage
+    // partitioning / opaque origins), and with the flag unset every page
+    // reloaded itself forever - the "game never loads AT ALL" bug. window.name
+    // survives same-tab reloads even with storage completely blocked.
+    const COI_FLAG = "coiReloadedBySelf";
+    const COI_NAME_TAG = "|kantasu-coi-1|";
+    function coiAlreadyTried() {
+        try { if (sessionStorage.getItem(COI_FLAG) === "1") return true; } catch (e) {}
+        try { if (String(window.name).indexOf(COI_NAME_TAG) !== -1) return true; } catch (e) {}
+        return false;
+    }
+    function coiMarkTried() {
+        try { sessionStorage.setItem(COI_FLAG, "1"); } catch (e) {}
+        try {
+            var n = String(window.name || "");
+            if (n.indexOf(COI_NAME_TAG) === -1) window.name = n + COI_NAME_TAG;
+        } catch (e) {}
+    }
     window.COI_RELOADING = false;
     if (!window.crossOriginIsolated && "serviceWorker" in navigator) {
-        let flagSet = false;
-        try { flagSet = sessionStorage.getItem("coiReloadedBySelf") === "1"; } catch (e) {}
         // No controller on this load + not attempted yet this session ->
         // registration + reload is unavoidable (barring registration failure,
         // which clears the flag below).
-        if (!flagSet && !navigator.serviceWorker.controller) window.COI_RELOADING = true;
+        if (!coiAlreadyTried() && !navigator.serviceWorker.controller) window.COI_RELOADING = true;
     }
 
     // Exposed so the page can await the isolation attempt before choosing
@@ -86,25 +104,20 @@ else {
         if (window.crossOriginIsolated) return "isolated"; // already isolated
         if (!("serviceWorker" in navigator)) return "no-sw";
 
-        // One reload attempt per tab session. The flag is written BEFORE any
-        // async work so the updatefound/controllerchange races can never cause
-        // a reload loop: even if events fire mid-registration, the next load
-        // sees the flag and never reloads again. If isolation still fails
-        // after the single retry (e.g. Safari without COEP support), the site
-        // simply continues single-threaded - never loops.
-        const FLAG = "coiReloadedBySelf";
-        let reloaded = false;
-        try { reloaded = sessionStorage.getItem(FLAG) === "1"; } catch (e) {}
-        if (reloaded) return "already-tried";
-
-        try { sessionStorage.setItem(FLAG, "1"); } catch (e) {}
+        // One reload attempt per tab session (sessionStorage + window.name,
+        // whichever works). If isolation still fails after the single retry
+        // (e.g. a browser that rejects COEP), the site simply continues
+        // single-threaded - never loops.
+        if (coiAlreadyTried()) return "already-tried";
+        coiMarkTried();
 
         try {
             await navigator.serviceWorker.register("coi-sw.js");
             if (window.crossOriginIsolated) { window.COI_RELOADING = false; return "isolated-late"; }
-            // Give a freshly-installed worker a moment to activate and claim
-            // this page, then reload so the document is served through the
-            // worker with COI headers.
+            // If this page is already controlled by the worker but STILL not
+            // isolated, its navigation response went through a fallback path
+            // without COI headers. One more reload may pick the header path
+            // up; the marker above guarantees this can only happen once.
             if (!navigator.serviceWorker.controller) {
                 await new Promise((resolve) => {
                     const done = () => { clearTimeout(timer); resolve(); };
@@ -113,6 +126,10 @@ else {
                 });
             }
             location.reload();
+            // SAFETY NET: if the reload somehow fails to replace this
+            // document, clear the gate flag so the page's boot logic is
+            // allowed to run instead of waiting forever.
+            setTimeout(() => { try { window.COI_RELOADING = false; } catch (e) {} }, 3000);
             return "reloading";
         } catch (err) {
             // Registration failed - no reload is coming, let the page boot.

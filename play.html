@@ -152,6 +152,8 @@
 
         // ===== MAIN LOADING LOGIC =====
         async function loadGame() {
+            if (window.__KANTASU_BOOTED) return; // never boot twice
+            window.__KANTASU_BOOTED = true;
             var params = new URLSearchParams(window.location.search);
             var romUrl = '';
             var gameName = '';
@@ -163,18 +165,40 @@
             // reload. Starting the emulator (or any IndexedDB work) here
             // would leave databases permanently locked when the reload kills
             // the page mid-transaction - the "games never load again" state.
-            // If a reload is coming, wait for it (bounded); if registration
-            // fails and no reload happens after all, boot normally.
+            // BUG FIX ("game never loads again"): the old code returned
+            // whenever COI_RELOADING was still true after an 8s race - but
+            // COI_DONE can stay pending forever (service worker bypassed by a
+            // hard reload, registration stall, storage eviction) so the page
+            // waited for a reload that NEVER came and booted nothing, ever.
+            // Now: only stand down when the isolation reload is CONFIRMED
+            // imminent (COI_DONE resolved "reloading"); otherwise boot now.
+            // If a reload does land later anyway, the storage-probe/repair
+            // logic below already recovers from a mid-transaction kill.
             if (window.COI_RELOADING === true) {
                 document.getElementById('game-name').textContent =
                     (params.get('name') || 'Game') + ' \u2014 preparing...';
+                var coiOutcome = null;
                 try {
-                    await Promise.race([
-                        window.COI_DONE,
-                        new Promise(function (r) { setTimeout(r, 8000); })
+                    coiOutcome = await Promise.race([
+                        Promise.resolve(window.COI_DONE).catch(function () { return 'failed'; }),
+                        new Promise(function (r) { setTimeout(function () { r('timeout'); }, 8000); })
                     ]);
-                } catch (e) {}
-                if (window.COI_RELOADING === true) return; // reload confirmed
+                } catch (e) { coiOutcome = 'timeout'; }
+                if (coiOutcome === 'reloading' && window.COI_RELOADING === true) {
+                    // Reload confirmed imminent - stand down... but if this
+                    // page is still alive 6s later the reload failed; boot
+                    // anyway rather than show nothing forever.
+                    window.__KANTASU_BOOTED = false;
+                    setTimeout(function () {
+                        if (!window.EJS_emulator) {
+                            try { window.COI_RELOADING = false; } catch (e) {}
+                            loadGame();
+                        }
+                    }, 6000);
+                    return;
+                }
+                // False alarm or stalled registration: boot the game now.
+                try { window.COI_RELOADING = false; } catch (e) {}
                 document.getElementById('game-name').textContent = params.get('name') || 'Game';
             }
 
@@ -517,7 +541,7 @@
                 b.textContent = btnLabel;
                 b.onclick = function () { try { btnFn(); } catch (e) {} t.style.display = 'none'; };
                 var actions = t.querySelector('.toast-actions');
-                if (actions) actions.insertBefore(b, actions.firstChild);
+                if (btnLabel && actions) actions.insertBefore(b, actions.firstChild); else b.remove();
                 t.style.display = 'flex';
                 clearTimeout(t._timer);
                 if (!sticky) t._timer = setTimeout(function () { t.style.display = 'none'; }, 8000);
@@ -598,6 +622,22 @@
                 try {
                     var gm = window.EJS_emulator && EJS_emulator.gameManager;
                     if (!gm || !window.EJS_emulator.started) return;
+                    // Only snapshot a RUNNING game. If the core is stalled
+                    // (background tab, suspended audio, boot freeze) the
+                    // snapshot would be a "frozen" state that also freezes
+                    // the game on resume - poisoning every future launch.
+                    // Guard: the frame counter must have advanced past the
+                    // boot baseline by at least 20 frames since boot.
+                    try {
+                        var f = gm.getFrameNum();
+                        if (f === null || f === undefined) return;
+                        if (typeof window.__kantasu_boot_frame === 'number') {
+                            if (f - window.__kantasu_boot_frame < 20) return;
+                        } else {
+                            window.__kantasu_boot_frame = f;
+                            return; // baseline just set - not live yet
+                        }
+                    } catch (ef) {}
                     // getState() is synchronous and returns a COPY of the
                     // state bytes (safe against HEAP moves afterwards).
                     var state = gm.getState();
@@ -607,7 +647,8 @@
                     autoStateBusy = true;
                     KantasuSaves.putState(SAVE_KEY, {
                         gameName: SAVE_META.gameName,
-                        source: source
+                        source: source,
+                        core: LEGACY_MODE ? '423' : '43'
                     }, buf, AUTO_SLOT).then(function () {
                         saveLastTime = Date.now(); // keep the badge fresh
                         saveBadgeRefresh();
@@ -633,27 +674,92 @@
             }
             window.KANTASU_START_FRESH = startFresh;
 
-            // Auto-resume: import the auto state right after the game boots.
-            // Uses the same load pattern EmulatorJS itself uses for
-            // EJS_loadStateUrl (load on "start" + short setTimeout).
+            // Auto-resume: import the auto state once the core is actually
+            // ALIVE and rendering. The old version fired on a fixed 1.2s
+            // timer after "start" - but with the threaded core the emscripten
+            // pthread is still initializing at that point, so a 16MB
+            // loadState() into the heap mid-boot could hard-freeze the game
+            // forever ("game never loads"). Now we wait until the frame
+            // counter is demonstrably ticking (the core is producing frames)
+            // before touching the heap, then verify the core is still running
+            // AFTER the load; if it froze, the bad state is dropped and the
+            // game reboots clean automatically instead of dying silently.
             function autoResume() {
                 if (autoStateResumed || !SAVE_KEY || !window.KantasuSaves) return;
                 KantasuSaves.getAutoState(SAVE_KEY).then(function (rec) {
                     if (!rec || !rec.data || !rec.data.byteLength) return;
+                    // Cross-build guard: save states are core-build specific.
+                    // An old-build state loaded into the other build can
+                    // corrupt or hard-freeze the core. Untagged states are
+                    // from the pre-4.3 (4.2.3) era. Drop instead of loading;
+                    // the 30s capture timer re-creates the point immediately.
+                    var wantCore = LEGACY_MODE ? '423' : '43';
+                    var recCore = rec.core || '423'; // untagged = 4.2.3 era
+                    if (recCore !== wantCore) {
+                        try { KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)); } catch (e) {}
+                        return;
+                    }
                     autoStateResumed = true; // only one attempt per session
-                    setTimeout(function () {
+
+                    function frameNow() {
+                        try {
+                            var gm = window.EJS_emulator && EJS_emulator.gameManager;
+                            return (gm && window.EJS_emulator.started) ? gm.getFrameNum() : null;
+                        } catch (e) { return null; }
+                    }
+
+                    // Phase 1: wait for a live core (frame counter advances
+                    // between two samples ~600ms apart). Bounded at 25s.
+                    var tries = 0;
+                    (function waitForLiveCore() {
+                        if (params.get('fresh') === '1') return; // aborted
+                        var a = frameNow();
+                        setTimeout(function () {
+                            var b = frameNow();
+                            var live = (a !== null && b !== null && b > a);
+                            if (live) return doLoad();
+                            if (++tries > 40) return; // give up silently - game boots fresh
+                            setTimeout(waitForLiveCore, 600);
+                        }, 600);
+                    })();
+
+                    function doLoad() {
+                        if (params.get('fresh') === '1') return;
                         try {
                             var gm = window.EJS_emulator && EJS_emulator.gameManager;
                             if (!gm || !window.EJS_emulator.started) { autoStateResumed = false; return; }
+                            var before = frameNow();
                             gm.loadState(new Uint8Array(rec.data));
-                            var when = KantasuSaves.formatAgo(rec.createdAt);
-                            saveToastAction('Resumed where you left off (' + when + ')', 'Start Fresh', startFresh, false);
+                            // Phase 2: verify the core survived the load. The
+                            // frame counter may be rewound to the saved
+                            // value, so we check for ANY movement within 8s.
+                            var checks = 0, loaded0 = frameNow();
+                            (function verifyAlive() {
+                                var f = frameNow();
+                                if (f !== null && f !== loaded0) {
+                                    var when = KantasuSaves.formatAgo(rec.createdAt);
+                                    saveToastAction('Resumed where you left off (' + when + ')', 'Start Fresh', startFresh, false);
+                                    return; // alive - done
+                                }
+                                if (++checks > 13) {
+                                    // Frozen core: the stored state is bad
+                                    // (captured while the game was stalled).
+                                    // Drop it and reboot clean - self-healing.
+                                    try { KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)); } catch (e2) {}
+                                    var u = new URL(window.location.href);
+                                    u.searchParams.set('fresh', '1');
+                                    u.searchParams.set('rec', '1');
+                                    location.replace(u.href);
+                                    return;
+                                }
+                                setTimeout(verifyAlive, 600);
+                            })();
                         } catch (e) {
                             // Corrupt/incompatible state - drop it so the
                             // game boots clean next time too.
                             try { KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)); } catch (e2) {}
                         }
-                    }, 1200);
+                    }
                 }).catch(function () {});
             }
 
@@ -771,12 +877,40 @@
                 } catch (e) {}
             }
 
+            // ===== EMULATOR BUILD SELECTION =====
+            // Two full EmulatorJS builds ship with the site:
+            //   data-v43/  - EmulatorJS 4.3.0-pre (May 2026): redone start-game
+            //                detection + save-state reading (the two subsystems
+            //                behind the "game never loads" / frozen-resume
+            //                bugs), newer core builds. DEFAULT for every game.
+            //   data/      - EmulatorJS 4.2.3 (proven stable). Games that are
+            //                known to freeze on 4.3 (verified: Pokemon Stadium
+            //                2) or that froze at boot once on this browser are
+            //                pinned here automatically - the choice is
+            //                remembered per game, so a single freeze never
+            //                blocks a game again.
+            var LEGACY_FLAG_PREFIX = 'kantasu_legacy_core:';
+            var LEGACY_STATIC = { 'roms/og-roms/pokemon-stadium-2.zip': 1 };
+            var LEGACY_MODE = false;
+            if (params.get('legacy') === '1') {
+                LEGACY_MODE = true;
+            } else if (LEGACY_STATIC[params.get('rom') || '']) {
+                LEGACY_MODE = true;
+            } else {
+                try {
+                    if (SAVE_KEY && localStorage.getItem(LEGACY_FLAG_PREFIX + SAVE_KEY) === '1') LEGACY_MODE = true;
+                } catch (e) {}
+            }
+            var EJS_DATA_DIR = LEGACY_MODE ? 'data/' : 'data-v43/';
+
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
             EJS_core = 'mupen64plus_next';
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
-            EJS_pathtodata = 'data/';
+            // Absolute path: the 4.3 loader resolves relative paths against
+            // the parent folder, which breaks on a root-level play.html.
+            EJS_pathtodata = new URL(EJS_DATA_DIR, document.baseURI).href;
             EJS_startOnLoaded = true;
             EJS_volume = 1;
             EJS_AdUrl = '';
@@ -943,7 +1077,29 @@
                 var started = false;
                 try { started = window.EJS_emulator && EJS_emulator.started; } catch (e) { started = false; }
                 if (started) { clearInterval(bootTimer); return; }
-                if (Date.now() - bootStart > 45000) {
+                var elapsed = Date.now() - bootStart;
+                // 30s with no start on the NEW (4.3) build: some ROMs crash
+                // the newer core at boot ("memory access out of bounds" -
+                // verified with Dream 64 / B3313 Original). The game never
+                // starts, so the in-start freeze detector cannot run. Fall
+                // back to the proven 4.2.3 build automatically, once per
+                // game (the flag makes it permanent - no loop possible).
+                if (!LEGACY_MODE && elapsed > 30000 && !window.__kantasu_legacy_retry) {
+                    // Still downloading a big ROM/CDN core is NOT a crash -
+                    // only switch when the load phase is past downloading.
+                    var phaseText = '';
+                    try { var gEl = document.getElementById('game'); if (gEl) phaseText = (gEl.innerText || '').trim().toLowerCase(); } catch (e) {}
+                    if (phaseText.indexOf('download') === -1) {
+                        window.__kantasu_legacy_retry = 1;
+                        clearInterval(bootTimer);
+                        try { if (SAVE_KEY) localStorage.setItem(LEGACY_FLAG_PREFIX + SAVE_KEY, '1'); } catch (e) {}
+                        var u = new URL(window.location.href);
+                        u.searchParams.set('legacy', '1');
+                        location.replace(u.href);
+                        return;
+                    }
+                }
+                if (elapsed > 45000) {
                     clearInterval(bootTimer);
                     showBootPanel();
                 }
@@ -1000,6 +1156,35 @@
             // Fires once the game is actually running (wired by loader.js).
             window.EJS_onGameStart = function () {
                 attachSaveListeners();
+                // Baseline for the auto-state "is the core actually running"
+                // guard (captureAutoState refuses to snapshot a stalled core,
+                // because a frozen state would freeze every future launch).
+                try { window.__kantasu_boot_frame = EJS_emulator.gameManager.getFrameNum(); } catch (e) {}
+
+                // ===== BOOT-FREEZE AUTO-FALLBACK =====
+                // On the new (4.3) build only: if the core produces ZERO
+                // frames for 15 straight seconds after start, it is frozen
+                // (seen with some ROMs on the new core build). Remember the
+                // game and reload once on the proven 4.2.3 build - the flag
+                // makes the switch permanent per game, so this can never
+                // loop. Frozen cores on the legacy build are left to the
+                // boot watchdog panel instead.
+                if (!LEGACY_MODE) {
+                    var ffBase = null, ffChecks = 0;
+                    (function bootFreezeDetector() {
+                        if (window.__kantasu_suppress_freeze_detect) return;
+                        var f = null;
+                        try { f = EJS_emulator.gameManager.getFrameNum(); } catch (e) {}
+                        if (f === null || f === undefined) { setTimeout(bootFreezeDetector, 3000); return; }
+                        if (ffBase === null) { ffBase = f; setTimeout(bootFreezeDetector, 15000); return; }
+                        if (f > ffBase) return; // core is running - all good
+                        if (++ffChecks > 2) return; // verify twice, then stop
+                        try { if (SAVE_KEY) localStorage.setItem(LEGACY_FLAG_PREFIX + SAVE_KEY, '1'); } catch (e) {}
+                        var u = new URL(window.location.href);
+                        u.searchParams.set('legacy', '1');
+                        location.replace(u.href);
+                    })();
+                }
 
                 // "Start Fresh" flow: ?fresh=1 means do NOT auto-resume.
                 // Delete the stored auto state (so this session's 30s timer
@@ -1010,9 +1195,16 @@
                         KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT));
                         var cleanUrl = new URL(window.location.href);
                         cleanUrl.searchParams.delete('fresh');
+                        cleanUrl.searchParams.delete('rec');
                         history.replaceState(null, '', cleanUrl.href);
                     } catch (e) {}
                     autoStateResumed = true; // block resume this session
+                    if (params.get('rec') === '1') {
+                        // We just auto-recovered from a frozen resume state.
+                        setTimeout(function () {
+                            saveToastAction('A stuck resume point was found and removed - started fresh', null, null, true);
+                        }, 2500);
+                    }
                 }
 
                 // Restore: if kantasu_saves_db holds a copy of this game's save
@@ -1196,9 +1388,9 @@
 
             EJS_debug = false;
 
-            // Load emulator with cache-busting
+            // Load the selected emulator build (cache-busted)
             var script = document.createElement('script');
-            script.src = 'data/loader.js?v=' + Date.now();
+            script.src = EJS_DATA_DIR + 'loader.js?v=' + Date.now();
             document.body.appendChild(script);
         }
 

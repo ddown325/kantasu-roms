@@ -131,6 +131,12 @@
             gameName: meta.gameName || 'Unknown Game',
             slot: slot,
             screenshot: meta.screenshot || null,
+            // Which emulator build wrote this state ('43' | '423'). States
+            // are core-build specific - a 4.2.3 state loaded into the 4.3
+            // core can corrupt/freeze it, so play.html refuses to cross-load
+            // and quietly re-creates the point instead. Untagged records are
+            // from the pre-4.3 era (written by the 4.2.3 build).
+            core: meta.core || null,
             createdAt: Date.now(),
             size: data.byteLength,
             data: data instanceof ArrayBuffer ? data : new Uint8Array(data).buffer
