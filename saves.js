@@ -12,6 +12,10 @@
  *   - Frequent auto-backup while playing (see play.html)
  *   - Emergency flush on page hide / unload
  *   - Automatic restore on game launch (newest copy wins)
+ *   - AUTO-RESUME STATES (slot 0): the player's exact position is snapshotted
+ *     every 30s and on page exit, then re-imported automatically on the next
+ *     launch - no in-game save needed, reload lands you right back where
+ *     you were
  *   - Full management UI (export / import / delete) in the launcher
  *
  * Storage layout (IndexedDB: kantasu_saves_db, version 1):
@@ -142,6 +146,13 @@
                   .sort(function (a, b) { return b.createdAt - a.createdAt; });
     }
 
+    /** The auto-resume state (slot 0): the exact point the player left off. */
+    async function getAutoState(gameKey) {
+        if (!gameKey) return null;
+        await openDB();
+        return promisify(tx('states', 'readonly').get(stateKey(gameKey, 0)));
+    }
+
     async function deleteState(key) {
         await openDB();
         await promisify(tx('states', 'readwrite').delete(key));
@@ -252,6 +263,8 @@
         listSaves: listSaves,
         putState: putState,
         getStates: getStates,
+        getAutoState: getAutoState,
+        AUTO_SLOT: 0,
         deleteState: deleteState,
         listStates: listStates,
         saveToFile: saveToFile,

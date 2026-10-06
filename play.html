@@ -78,7 +78,7 @@
         <div class="nav-right">
             <span class="status-badge" id="fps-badge" title="Emulated frames per second (N64 full speed is 20-30 depending on the game)">-- fps</span>
             <span class="status-badge" id="thread-badge" title="MT = multi-threaded emulation (SharedArrayBuffer active). ST = single-threaded fallback - try Chrome/Edge or a hard refresh.">…</span>
-            <span id="save-badge" class="pending" title="Persistent save status - your in-game saves are backed up to a dedicated database every 20 seconds and on page close. Click to back up now">save: …</span>
+            <span id="save-badge" class="pending" title="Persistent save status - your in-game saves AND your exact position (auto-resume state) are backed up to a dedicated database every 20-30 seconds and on page close. Reload and you resume exactly where you left off. Click to back up now">save: …</span>
             <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Smooth (1x)</button>
         </div>
     </div>
@@ -460,7 +460,12 @@
             //   4. RESTORE: on boot, if our copy is newer than what the
             //      emulator's file system holds, it is injected before the
             //      game reads it (or hot-loaded right after start).
-            //   5. Save states get the same treatment (mirror + stable key),
+            //   5. AUTO-RESUME (the headline feature): a full save STATE -
+            //      the exact frame the player is on - is captured every 30s
+            //      and on page exit, then automatically re-imported on the
+            //      next launch. Reload a game and you are back exactly where
+            //      you were, even if you never touched an in-game save point.
+            //   6. Save states get the same treatment (mirror + stable key),
             //      replacing the emulator's single unnamed slot per game.
             var SAVE_KEY = (window.KantasuSaves && params) ? KantasuSaves.gameKeyFromParams(params) : null;
             var SAVE_META = {
@@ -488,10 +493,45 @@
             function saveToast(msg) {
                 var t = document.getElementById('save-toast');
                 if (!t) return;
+                saveToastResetButtons();
                 document.getElementById('save-toast-text').textContent = msg;
                 t.style.display = 'flex';
                 clearTimeout(t._timer);
                 t._timer = setTimeout(function () { t.style.display = 'none'; }, 4000);
+            }
+
+            // Toast with a custom action button (used for auto-resume notice).
+            function saveToastAction(msg, btnLabel, btnFn, sticky) {
+                var t = document.getElementById('save-toast');
+                if (!t) return;
+                document.getElementById('save-toast-text').textContent = msg;
+                var exportBtn = document.getElementById('save-toast-export');
+                var dismissBtn = document.getElementById('save-toast-dismiss');
+                if (exportBtn) { exportBtn.style.display = 'none'; }
+                if (dismissBtn) { dismissBtn.style.display = 'none'; }
+                // remove any previously injected action button
+                var old = t.querySelector('.toast-dynamic-btn');
+                if (old) old.remove();
+                var b = document.createElement('button');
+                b.className = 'toast-dynamic-btn';
+                b.textContent = btnLabel;
+                b.onclick = function () { try { btnFn(); } catch (e) {} t.style.display = 'none'; };
+                var actions = t.querySelector('.toast-actions');
+                if (actions) actions.insertBefore(b, actions.firstChild);
+                t.style.display = 'flex';
+                clearTimeout(t._timer);
+                if (!sticky) t._timer = setTimeout(function () { t.style.display = 'none'; }, 8000);
+            }
+
+            function saveToastResetButtons() {
+                var t = document.getElementById('save-toast');
+                if (!t) return;
+                var exportBtn = document.getElementById('save-toast-export');
+                var dismissBtn = document.getElementById('save-toast-dismiss');
+                if (exportBtn) { exportBtn.style.display = ''; }
+                if (dismissBtn) { dismissBtn.style.display = ''; }
+                var old = t.querySelector('.toast-dynamic-btn');
+                if (old) old.remove();
             }
 
             function saveMirror(buf, source) {
@@ -540,6 +580,83 @@
             }
             if (saveBadge) saveBadge.addEventListener('click', saveNow);
 
+            // ===== AUTO-RESUME STATE (slot 0) =====
+            // "Export where the user was, import on reload." The SRAM mirror
+            // above only preserves IN-GAME saves (save files the game itself
+            // writes). This layer snapshots the ENTIRE emulator state - the
+            // exact frame the player is on - every 30 seconds and on page
+            // exit, then re-imports it automatically on the next launch, so
+            // a reload lands the player exactly where they left off without
+            // touching an in-game save point.
+            var AUTO_SLOT = 0;
+            var autoStateTimer = null;
+            var autoStateBusy = false;     // a capture is being written
+            var autoStateResumed = false;  // we already resumed this session
+
+            function captureAutoState(source) {
+                if (!SAVE_KEY || !window.KantasuSaves || autoStateBusy) return;
+                try {
+                    var gm = window.EJS_emulator && EJS_emulator.gameManager;
+                    if (!gm || !window.EJS_emulator.started) return;
+                    // getState() is synchronous and returns a COPY of the
+                    // state bytes (safe against HEAP moves afterwards).
+                    var state = gm.getState();
+                    if (!state || !state.length) return;
+                    var buf = KantasuSaves.toArrayBuffer(state);
+                    if (!buf || !buf.byteLength) return;
+                    autoStateBusy = true;
+                    KantasuSaves.putState(SAVE_KEY, {
+                        gameName: SAVE_META.gameName,
+                        source: source
+                    }, buf, AUTO_SLOT).then(function () {
+                        saveLastTime = Date.now(); // keep the badge fresh
+                        saveBadgeRefresh();
+                    }).catch(function () {}).then(function () {
+                        autoStateBusy = false;
+                    });
+                } catch (e) {}
+            }
+
+            // Delete the auto-resume state and reload WITHOUT resuming:
+            // the "Start Fresh" escape hatch. ?fresh=1 also guards against
+            // the current session's 30s timer re-writing a state before the
+            // reload completes.
+            function startFresh() {
+                if (!SAVE_KEY || !window.KantasuSaves) { location.reload(); return; }
+                try {
+                    KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)).then(function () {
+                        var u = new URL(window.location.href);
+                        u.searchParams.set('fresh', '1');
+                        location.href = u.href;
+                    }).catch(function () { location.reload(); });
+                } catch (e) { location.reload(); }
+            }
+            window.KANTASU_START_FRESH = startFresh;
+
+            // Auto-resume: import the auto state right after the game boots.
+            // Uses the same load pattern EmulatorJS itself uses for
+            // EJS_loadStateUrl (load on "start" + short setTimeout).
+            function autoResume() {
+                if (autoStateResumed || !SAVE_KEY || !window.KantasuSaves) return;
+                KantasuSaves.getAutoState(SAVE_KEY).then(function (rec) {
+                    if (!rec || !rec.data || !rec.data.byteLength) return;
+                    autoStateResumed = true; // only one attempt per session
+                    setTimeout(function () {
+                        try {
+                            var gm = window.EJS_emulator && EJS_emulator.gameManager;
+                            if (!gm || !window.EJS_emulator.started) { autoStateResumed = false; return; }
+                            gm.loadState(new Uint8Array(rec.data));
+                            var when = KantasuSaves.formatAgo(rec.createdAt);
+                            saveToastAction('Resumed where you left off (' + when + ')', 'Start Fresh', startFresh, false);
+                        } catch (e) {
+                            // Corrupt/incompatible state - drop it so the
+                            // game boots clean next time too.
+                            try { KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT)); } catch (e2) {}
+                        }
+                    }, 1200);
+                }).catch(function () {});
+            }
+
             // Emergency flush - fires when the tab is being hidden or closed.
             // IndexedDB writes started in pagehide complete in all major
             // browsers (the event loop keeps running until they settle).
@@ -548,6 +665,9 @@
                 if (saveEmergencyDone) return;
                 saveEmergencyDone = true;
                 saveNow();
+                // THE critical one: snapshot exactly where the player is
+                // right now, so the next launch resumes from this point.
+                captureAutoState('exit');
             }
             window.addEventListener('pagehide', saveEmergencyFlush);
             document.addEventListener('visibilitychange', function () {
@@ -615,13 +735,20 @@
                 } catch (e) {}
 
                 // Load state pressed - vetoed too, so we own the flow:
-                // newest state from our DB, else the emulator's browser copy,
-                // else fall back to a file picker.
+                // the player's MANUAL save state (slot 1) first, then the
+                // auto-resume state (slot 0), else the emulator's browser
+                // copy, else fall back to a file picker.
                 try {
                     EJS_emulator.on("loadState", function () {
                         KantasuSaves.getStates(SAVE_KEY).then(async function (states) {
-                            var chosen = null;
-                            if (states && states.length) chosen = states[0].data;
+                            var manual = states && states.length
+                                ? states.filter(function (s) { return s.slot !== 0; })
+                                : [];
+                            var auto = states && states.length
+                                ? states.filter(function (s) { return s.slot === 0; })
+                                : [];
+                            var chosen = manual.length ? manual[0].data
+                                       : auto.length ? auto[0].data : null;
                             if (!chosen) {
                                 try {
                                     var legacy = await EJS_emulator.storage.states.get(EJS_emulator.getBaseFileName() + ".state");
@@ -631,7 +758,7 @@
                             if (chosen) {
                                 try {
                                     EJS_emulator.gameManager.loadState(new Uint8Array(chosen));
-                                    EJS_emulator.displayMessage("SAVE LOADED FROM BACKUP");
+                                    EJS_emulator.displayMessage(manual.length ? "SAVE LOADED FROM BACKUP" : "RESUME POINT LOADED");
                                 } catch (e) { saveToast('Could not load state'); }
                             } else {
                                 try {
@@ -869,10 +996,24 @@
                 }, 1000);
             };
 
-            // ===== GAME START: restore the newest save + start auto-backup =====
+            // ===== GAME START: restore the newest save + resume + auto-backup =====
             // Fires once the game is actually running (wired by loader.js).
             window.EJS_onGameStart = function () {
                 attachSaveListeners();
+
+                // "Start Fresh" flow: ?fresh=1 means do NOT auto-resume.
+                // Delete the stored auto state (so this session's 30s timer
+                // doesn't resurrect the old position) and clean the param
+                // out of the URL so a normal reload later resumes normally.
+                if (params.get('fresh') === '1' && SAVE_KEY && window.KantasuSaves) {
+                    try {
+                        KantasuSaves.deleteState(KantasuSaves.stateKey(SAVE_KEY, AUTO_SLOT));
+                        var cleanUrl = new URL(window.location.href);
+                        cleanUrl.searchParams.delete('fresh');
+                        history.replaceState(null, '', cleanUrl.href);
+                    } catch (e) {}
+                    autoStateResumed = true; // block resume this session
+                }
 
                 // Restore: if kantasu_saves_db holds a copy of this game's save
                 // that is newer than (or missing from) the emulator's own
@@ -911,7 +1052,6 @@
                                 saveLastBuffer = ours;
                                 saveLastTime = Date.now();
                                 saveBadgeRefresh();
-                                saveToast('Save data restored from backup');
                             } else if (fsHasSave && fsData && fsTime > ourTime) {
                                 // The emulator's copy is newer (e.g. saved on a
                                 // machine where our layer wasn't active yet):
@@ -922,6 +1062,12 @@
                     }).catch(function () {});
                 }
 
+                // AUTO-RESUME: import the auto save state (the exact point
+                // where the player last was) right after boot. Runs after a
+                // short delay so the first frames render and the SRAM restore
+                // above settles first.
+                autoResume();
+
                 // Auto-backup: force a core flush + mirror every 20 seconds.
                 // At most ~20s of progress can ever be at risk now.
                 if (saveAutoTimer) clearInterval(saveAutoTimer);
@@ -930,6 +1076,18 @@
                         if (window.EJS_emulator && EJS_emulator.started) saveNow();
                     } catch (e) {}
                 }, 20000);
+
+                // AUTO-RESUME CAPTURE: snapshot the full emulator state every
+                // 30 seconds. Combined with the exit flush, the player is
+                // never more than half a minute away from where they'll
+                // resume. (N64 states are a few MB; getState() is a fast
+                // synchronous copy.)
+                if (autoStateTimer) clearInterval(autoStateTimer);
+                autoStateTimer = setInterval(function () {
+                    try {
+                        captureAutoState('interval');
+                    } catch (e) {}
+                }, 30000);
             };
 
             // ===== QUALITY MODE (Smooth / Sharp) =====

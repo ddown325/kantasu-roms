@@ -51,6 +51,8 @@
         .play-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2.5rem; opacity: 0; transition: opacity .2s; text-shadow: 0 2px 10px rgba(0,0,0,.8); }
         .game-card:hover .play-hint, .game-card.selected .play-hint { opacity: .9; }
         .badge { position: absolute; top: 8px; right: 8px; background: rgba(243,156,18,.9); color: #000; padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+        .resume-badge { position: absolute; top: 8px; left: 8px; background: rgba(76,175,80,.92); color: #06230a; padding: 3px 8px; border-radius: 4px; font-size: 0.62rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; display: flex; align-items: center; gap: 4px; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+        .resume-badge::before { content: '\25B6'; font-size: 0.55rem; }
         .delete-btn { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.7); color: var(--red); border: 1px solid rgba(244,67,54,.5); border-radius: 4px; width: 24px; height: 24px; font-size: 0.8rem; cursor: pointer; display: none; align-items: center; justify-content: center; }
         .game-card:hover .delete-btn { display: flex; }
         .delete-btn:hover { background: rgba(244,67,54,.3); }
@@ -106,6 +108,8 @@
         .saves-hint { font-size: 0.78rem; color: var(--text-secondary); }
         .save-item { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; background: var(--bg-card); }
         .save-item .state-thumb { width: 64px; height: 48px; border-radius: 6px; object-fit: cover; border: 1px solid var(--border); background: #000; flex-shrink: 0; }
+        .save-item.auto-state { border-left: 3px solid rgba(76,175,80,.7); }
+        .tag.state.auto { background: rgba(76,175,80,.18); border: 1px solid rgba(76,175,80,.5); color: #66bb6a; }
         .save-item .info { flex: 1; min-width: 0; }
         .save-item .info .name { font-size: 0.88rem; font-weight: 700; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .save-item .info .meta { display: flex; gap: 10px; font-size: 0.72rem; color: var(--text-secondary); flex-wrap: wrap; align-items: center; }
@@ -311,6 +315,23 @@
             }
         }
 
+        // gameKey -> timestamp of the newest auto-resume state (slot 0).
+        // Populated in init(); powers the green "Resume" badge on cards.
+        const AUTO_STATE_INDEX = {};
+        async function loadAutoStateIndex() {
+            if (!window.KantasuSaves) return;
+            try {
+                const states = await KantasuSaves.listStates();
+                for (const s of states) {
+                    if (s.slot === 0 && s.gameKey) {
+                        if (!AUTO_STATE_INDEX[s.gameKey] || (s.createdAt || 0) > AUTO_STATE_INDEX[s.gameKey]) {
+                            AUTO_STATE_INDEX[s.gameKey] = s.createdAt || 0;
+                        }
+                    }
+                }
+            } catch (e) {}
+        }
+
         let userGames = { 'og-roms': [], 'rom-hacks': [] };
         let selectedIndex = 0, cards = [], currentTab = 'og-roms';
 
@@ -327,8 +348,13 @@
             const badge = '';
             const hackBadge = '';
             const deleteBtn = '';
+            // Resume badge: this game has an auto-resume state - clicking it
+            // drops the player back exactly where they left off.
+            let resumeBadge = '';
+            const gk = (game.isUser || game.romBlob) ? ('user:' + game.id) : ('rom:' + (game.rom || '').split('/').pop().replace(/\.(zip|z64|n64|v64)$/i, ''));
+            if (AUTO_STATE_INDEX[gk]) resumeBadge = '<div class="resume-badge" title="You have a resume point from ' + new Date(AUTO_STATE_INDEX[gk]).toLocaleString() + ' - the game loads right back where you left off">Resume</div>';
             const cover = game.cover || 'data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22180%22 height=%22180%22><rect fill=%22%231e1e1e%22 width=%22180%22 height=%22180%22/><text x=%2290%22 y=%2290%22 fill=%22%239370db%22 font-size=%2240%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22>Game</text></svg>';
-            card.innerHTML = `${deleteBtn}${badge}${hackBadge}
+            card.innerHTML = `${deleteBtn}${badge}${hackBadge}${resumeBadge}
                 <div class="game-cover"><img src="${cover}" alt="${game.title}" loading="lazy"></div>
                 <div class="play-hint">&#9654;</div>
                 <div class="game-overlay"><div class="game-title">${game.title}</div><div class="game-system">${game.system || 'Nintendo 64'}</div></div>`;
@@ -554,7 +580,8 @@
 
                 states.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).forEach(rec => {
                     const item = document.createElement('div');
-                    item.className = 'save-item';
+                    item.className = 'save-item' + (rec.slot === 0 ? ' auto-state' : '');
+                    const isAuto = rec.slot === 0;
                     const title = rec.gameName || rec.gameKey;
                     const thumb = rec.screenshot
                         ? `<img class="state-thumb" src="${rec.screenshot}" alt="state screenshot">`
@@ -564,7 +591,7 @@
                         <div class="info">
                             <div class="name">${title}</div>
                             <div class="meta">
-                                <span class="tag state">Save State</span>
+                                <span class="tag state ${isAuto ? 'auto' : ''}">${isAuto ? 'Auto-Resume' : 'Save State'}</span>
                                 <span>${KantasuSaves.formatBytes(rec.size)}</span>
                                 <span>${new Date(rec.createdAt).toLocaleString()}</span>
                             </div>
@@ -596,9 +623,15 @@
             renderSavesList();
         }
         async function deleteStateRecord(key) {
-            if (!confirm('Delete this save state backup?')) return;
+            const isAuto = key.endsWith('::state::0');
+            const msg = isAuto
+                ? 'Delete this auto-resume point? The game will start from its title screen next time instead of resuming.'
+                : 'Delete this save state backup?';
+            if (!confirm(msg)) return;
             await KantasuSaves.deleteState(key);
+            delete AUTO_STATE_INDEX[key.split('::state::')[0]];
             renderSavesList();
+            renderGames('og-roms'); renderGames('rom-hacks'); renderGames('your-games');
         }
 
         // Import a .sav file: auto-matches the game by filename, otherwise asks.
@@ -651,6 +684,7 @@
                 if (!userGames[g.category]) userGames[g.category] = [];
                 userGames[g.category].push(g);
             }
+            await loadAutoStateIndex();
             renderGames('og-roms'); renderGames('rom-hacks'); renderGames('your-games');
             renderSavesList();
         }
