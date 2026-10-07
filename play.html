@@ -1559,6 +1559,103 @@
             // Fires once the game is actually running (wired by loader.js).
             window.EJS_onGameStart = function () {
                 attachSaveListeners();
+
+                // ===== VIDEO CANVAS RESYNC — the "1/4 screen" fix =====
+                // RAWeb sizes the game canvas ONCE, when the GL context is
+                // created. If the core's video mode changes after that
+                // (Sharp 2x mode 640x480, a late video-mode set after the
+                // boot logo, fullscreen enter/exit, or a save-state load),
+                // the GL viewport and the canvas backing store desync.
+                // WebGL's origin is the BOTTOM-LEFT corner, so the scene
+                // then paints into the bottom-left region of a wrongly
+                // sized canvas and shows up as the game zoomed into the
+                // bottom-left quarter of the screen. This watchdog re-syncs
+                // the canvas to the core's real video size, whenever they
+                // disagree, for as long as the session runs.
+                (function () {
+                    var directFails = 0;
+
+                    function resyncCanvas(reason) {
+                        try {
+                            var emu = window.EJS_emulator;
+                            if (!emu || !emu.started || !emu.canvas || !emu.gameManager) return false;
+                            var vw = 0, vh = 0;
+                            try {
+                                vw = emu.gameManager.getVideoDimensions('width') || 0;
+                                vh = emu.gameManager.getVideoDimensions('height') || 0;
+                            } catch (e) { return false; }
+                            if (vw < 8 || vh < 8) return false;
+                            var c = emu.canvas;
+                            if (c.width === vw && c.height === vh) return false;
+                            // Mismatch detected. Repair path 1: the module's
+                            // own canvas sizing (threaded-build aware).
+                            try {
+                                if (emu.Module && typeof emu.Module.setCanvasSize === 'function') {
+                                    emu.Module.setCanvasSize(vw, vh);
+                                } else {
+                                    c.width = vw; c.height = vh;
+                                }
+                                // Re-aim the GL viewport at the full canvas
+                                // (GL origin is bottom-left - the reason the
+                                // picture sat in the bottom-left corner).
+                                try {
+                                    var gl = (c.GLctxObject && c.GLctxObject.GLctx) ||
+                                             (emu.Module.GL && emu.Module.GL.ctx) || null;
+                                    if (gl) gl.viewport(0, 0, vw, vh);
+                                } catch (e2) {}
+                                if (c.width === vw && c.height === vh) {
+                                    try { emu.handleResize(); } catch (e3) {}
+                                    console.info('[kantasu] video canvas resynced to ' + vw + 'x' + vh + ' (' + reason + ')');
+                                    return true;
+                                }
+                            } catch (e) {}
+                            directFails++;
+                            return false;
+                        } catch (e) { return false; }
+                    }
+
+                    // Repair path 2 (only if direct sizing keeps failing,
+                    // e.g. an OffscreenCanvas owned by the threaded build):
+                    // a fullscreen round-trip - the emulator's own resize
+                    // path recreates the surface and resets the viewport.
+                    function fullscreenResync() {
+                        try {
+                            var emu = window.EJS_emulator;
+                            if (!emu || !emu.started) return;
+                            if (document.fullscreenElement) return; // already FS - leave it
+                            emu.toggleFullscreen(true);
+                            setTimeout(function () {
+                                try { emu.toggleFullscreen(false); } catch (e) {}
+                            }, 500);
+                        } catch (e) {}
+                    }
+
+                    // Poll: cheap cwrap string call every 800ms. The first 5
+                    // minutes cover boot logos, menus and late video-mode
+                    // switches; after that keep a slow 3s watch running.
+                    setInterval(function () {
+                        if (resyncCanvas('poll')) directFails = 0;
+                        if (directFails >= 3) { directFails = 0; fullscreenResync(); }
+                    }, 800);
+                    setInterval(function () { resyncCanvas('slow-poll'); }, 3000);
+
+                    // Refit on layout events too.
+                    window.addEventListener('resize', function () {
+                        setTimeout(function () { resyncCanvas('window-resize'); }, 300);
+                    });
+                    document.addEventListener('fullscreenchange', function () {
+                        setTimeout(function () { resyncCanvas('fullscreenchange'); }, 600);
+                    });
+                    document.addEventListener('visibilitychange', function () {
+                        if (!document.hidden) setTimeout(function () { resyncCanvas('visible'); }, 300);
+                    });
+
+                    // Immediate + settled checks around game start.
+                    resyncCanvas('game-start');
+                    setTimeout(function () { resyncCanvas('start+1s'); }, 1000);
+                    setTimeout(function () { resyncCanvas('start+4s'); }, 4000);
+                    setTimeout(function () { resyncCanvas('start+10s'); }, 10000);
+                })();
                 // Baseline for the auto-state "is the core actually running"
                 // guard (captureAutoState refuses to snapshot a stalled core,
                 // because a frozen state would freeze every future launch).
