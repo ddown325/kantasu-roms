@@ -93,7 +93,6 @@
             <span class="status-badge" id="fps-badge" title="Emulated frames per second (N64 full speed is 20-30 depending on the game)">-- fps</span>
             <span class="status-badge" id="thread-badge" title="MT = multi-threaded emulation (SharedArrayBuffer active). ST = single-threaded fallback - try Chrome/Edge or a hard refresh.">…</span>
             <span id="save-badge" class="pending" title="Persistent save status - your in-game saves AND your exact position (auto-resume state) are backed up to a dedicated database every 20-30 seconds and on page close. Reload and you resume exactly where you left off. Click to back up now">save: …</span>
-            <button class="perf-badge" id="core-toggle" title="Emulator core profile">…</button>
             <button class="perf-badge" id="quality-toggle" title="Switch graphics quality (applies on reload)">Smooth (1x)</button>
         </div>
     </div>
@@ -121,7 +120,7 @@
         </div>
     </div>
     <!-- Tap-to-start overlay: browsers block audio until a user gesture;
-         the lite core's audio loop blocks the whole game without it. Any
+         a core's audio loop can block the whole game without it. Any
          click anywhere resumes playback instantly. -->
     <div id="tap-start" style="display:none">
         <div class="play-circle">&#9654;</div>
@@ -412,8 +411,8 @@
             // ===== STORAGE PRE-FLIGHT (the install reality check) =====
             // The emulator doesn't run from the site: it INSTALLS itself into
             // this site's browser storage on first boot - the emulator core
-            // (a few MB: 0.9 MB download / 3.1 MB installed on the lite
-            // profile, about double on full) plus the ROM (up to ~67 MB)
+            // (a few MB: 1.5 MB download / ~6.6 MB installed) plus the ROM
+            // (up to ~67 MB)
             // caches everything in IndexedDB so later loads are instant. That
             // cache grows with every new game played (46 games is roughly
             // 900 MB of ROMs alone). When the origin's storage quota runs
@@ -839,13 +838,14 @@
                 if (autoStateResumed || !SAVE_KEY || !window.KantasuSaves) return;
                 KantasuSaves.getAutoState(SAVE_KEY).then(function (rec) {
                     if (!rec || !rec.data || !rec.data.byteLength) return;
-                    // Cross-core guard: save states are core-build
-                    // specific (worse than useless across cores - loading a
-                    // mupen64plus_next state into parallel_n64 corrupts or
-                    // hard-freezes it). States are tagged with the exact
-                    // core; untagged states are from the pre-4.3 (4.2.3)
-                    // era. Drop anything that does not match - the 30s
-                    // capture timer re-creates the point immediately.
+                    // Cross-core guard: save states are core-build specific
+                    // - loading a state captured on a different core
+                    // corrupts or hard-freezes the game. States are tagged
+                    // with the exact core; untagged states are from the
+                    // pre-4.3 (4.2.3) era, and 'p64'-tagged states came
+                    // from the lite core that v6 removed. Drop anything
+                    // that does not match - the 30s capture timer
+                    // re-creates the point immediately.
                     var wantCore = STATE_CORE_TAG;
                     var recCore = rec.core || '423'; // untagged = 4.2.3 era
                     if (recCore !== wantCore) {
@@ -1044,22 +1044,15 @@
             // site's own fast GitHub Pages CDN. Same-origin boot files also
             // avoid the Chromium cross-origin fetch/pthread race that
             // deadlocked ROM extraction in the all-CDN era.
-            // data/ = EmulatorJS 4.3.0-pre boot files + cores. CORE BUILD
-            // PROVENANCE (matters - the two cores come from different CDN
-            // release trains, verified compatible with the 4.3.0-pre engine):
-            //   mupen64plus_next(-thread)-wasm.data  = 4.3.0-pre builds
-            //   parallel_n64(-thread)-wasm.data      = /stable/ builds
-            // WHY: the 4.3.0-pre parallel_n64 build was compiled WITHOUT
-            // Asyncify, so its emscripten_fiber_swap import is an aborting
-            // stub ("Please compile your program with async support") - the
-            // core dies instantly at boot. The /stable/ build implements
-            // fiber_swap properly via Asyncify (its wasm is 4.5 MB vs 3.1,
-            // still two-thirds the size of mupen64plus_next's 6.6 MB) and
-            // runs the full catalog at full speed on the 4.3 engine (A/B
-            // verified: SM64 33-43 fps lite vs 18 fps full on a weak GPU).
-            // ALSO: the stable parallel_n64 core BLOCKS on audio until a
-            // user gesture (autoplay policy) - the "Tap to start" overlay
-            // in EJS_onGameStart covers sessions that arrive without one.
+            // data/ = EmulatorJS 4.3.0-pre boot files + the ONE core this
+            // site ships (v6): mupen64plus_next 4.3.0-pre (thread +
+            // single-thread builds, verified compatible with the engine).
+            // The parallel_n64 "lite" core was REMOVED entirely in v6: its
+            // Glide64 presentation mis-mapped the video by canvas geometry
+            // on this engine build (zoomed crops, offsets, quarter-screen
+            // frames varying per boot, unfixable from the page layer), so
+            // the core files were deleted from the repo and all selection
+            // plumbing removed.
             //
             // NOTE: the old per-game "legacy" fallback (EmulatorJS 4.2.3,
             // data-stable/) was REMOVED: in the hybrid layout the 4.2.3
@@ -1075,78 +1068,22 @@
             // ===== EMULATOR CONFIG =====
             EJS_player = '#game';
 
-            // ===== PERFORMANCE PROFILE: LITE (low-end) vs FULL =====
-            // Two N64 cores are hosted on this site, same engine:
-            //   LITE = parallel_n64 + Glide64mk2 renderer. Core download is
-            //          ~1.0 MB and the wasm ~4.5 MB (two-thirds of the full
-            //          core) - and Glide64 is the classic lightweight N64
-            //          renderer (simple shaders, few draw calls, full speed
-            //          on weak GPUs). Made for low-end / mobile /
-            //          integrated-GPU devices: smaller install, faster core
-            //          compile, less memory, less GC pressure. Measured:
-            //          ~2x the fps of the full core on a weak GPU.
-            //          v5 CAVEAT: its Glide64 presentation mis-maps video
-            //          by canvas geometry (zoom/quarter-screen class bugs,
-            //          varying per boot) - so it is OPT-IN ONLY since v5,
-            //          never the automatic default.
-            //   FULL = mupen64plus_next + GlideN64. Bigger (1.5 MB core
-            //          download, 6.6 MB wasm) and more accurate on edge
-            //          cases; the default on capable hardware.
-            // Selection order: ?perf= URL param, then the player's saved
-            // choice (nav toggle). v5: everyone else defaults to FULL - the
-            // lite core's video presentation is unreliable on this engine
-            // build, so low-end auto-detection only logs, it no longer
-            // picks lite (see the v5 note in the profile block below).
-            var LOW_END = false, LOW_END_WHY = [];
-            try {
-                var ua = navigator.userAgent || '';
-                if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) { LOW_END = true; LOW_END_WHY.push('mobile'); }
-                if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) { LOW_END = true; LOW_END_WHY.push(navigator.hardwareConcurrency + ' cpu threads'); }
-                if (navigator.deviceMemory && navigator.deviceMemory <= 4) { LOW_END = true; LOW_END_WHY.push(navigator.deviceMemory + ' GB ram'); }
-            } catch (e) {}
-            var perfParam = null, savedProfile = null;
-            try { perfParam = params.get('perf'); } catch (e) {}
-            // v5: the lite core's Glide64 presentation mis-maps the video
-            // depending on the canvas geometry sampled at core init -
-            // zoomed crops, offsets, or quarter-screen frames that vary
-            // per boot (reproduced and confirmed on the live site). The
-            // full core renders correctly at any canvas size (verified
-            // against the authentic title-screen geometry). So FULL is
-            // now the default for EVERYONE, low-end included: a correct
-            // picture at a lower frame rate beats a broken one. Lite
-            // remains available as an explicit manual choice (?perf=lite
-            // or the nav core toggle) for players who prefer its speed.
-            // One-time migration: clear stale saved 'lite' pins from the
-            // auto-detect era so nobody stays parked on the broken default.
-            try {
-                if (localStorage.getItem('kantasu_profile_v5') !== '1') {
-                    if (localStorage.getItem('kantasu_perf_profile') === 'lite') {
-                        localStorage.removeItem('kantasu_perf_profile');
-                    }
-                    localStorage.setItem('kantasu_profile_v5', '1');
-                }
-            } catch (e) {}
-            try { savedProfile = localStorage.getItem('kantasu_perf_profile'); } catch (e) {}
-            var PROFILE = (perfParam === 'lite' || perfParam === 'full') ? perfParam
-                        : (savedProfile === 'lite' || savedProfile === 'full') ? savedProfile
-                        : 'full';
-            try { localStorage.setItem('kantasu_perf_profile', PROFILE); } catch (e) {}
-            EJS_core = (PROFILE === 'lite') ? 'parallel_n64' : 'mupen64plus_next';
-            // ?core=parallel_n64 / ?core=mupen64plus_next remains the raw
-            // diagnostics override (GPU-driver escape hatch); it wins over
-            // the profile system.
-            var CORE_OVERRIDE = params.get('core');
-            if (CORE_OVERRIDE === 'parallel_n64' || CORE_OVERRIDE === 'mupen64plus_next') {
-                EJS_core = CORE_OVERRIDE;
-            }
-            // Save states are core-specific: a state captured on one core
-            // loaded into the other corrupts or hard-freezes it. Every
-            // auto-resume state is tagged with the core it was made on and
-            // mismatched states are dropped instead of loaded.
-            var STATE_CORE_TAG = '43:' + (EJS_core === 'parallel_n64' ? 'p64' : 'm64n');
-            if (LOW_END_WHY.length) {
-                try { console.info('[kantasu] low-end device detected (' + LOW_END_WHY.join(', ') + ') - staying on the full core for correct video (v5); the lite core is available via the core toggle'); } catch (e) {}
-            }
+            // ===== EMULATOR CORE (v6: single core, lite removed) =====
+            // The site ships exactly one N64 core: mupen64plus_next +
+            // GlideN64. It renders correctly at any canvas size on every
+            // device (verified against the authentic title-screen geometry).
+            // The parallel_n64/Glide64 "lite" core was removed in v6: its
+            // presentation mis-mapped the video by canvas geometry on this
+            // engine build (zoomed crops, offsets, quarter-screen frames
+            // varying per boot), and no page-side configuration fixed it.
+            // Old 'kantasu_perf_profile' / 'kantasu_profile_v5' localStorage
+            // pins are inert and ignored; the ?perf= URL param does nothing.
+            EJS_core = 'mupen64plus_next';
+            // Save states are core-specific: a state captured on another
+            // core (the removed lite core, or the 4.2.3 era) corrupts or
+            // hard-freezes this one. Every auto-resume state is tagged with
+            // the core it was made on; mismatched states are dropped.
+            var STATE_CORE_TAG = '43:m64n';
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
             // Absolute CDN path: the 4.3 loader resolves relative paths against
@@ -1173,8 +1110,6 @@
             window.EJS_paths = {
                 'mupen64plus_next-thread-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-thread-wasm.data?v=' + ASSET_VER,
                 'mupen64plus_next-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-wasm.data?v=' + ASSET_VER,
-                'parallel_n64-thread-wasm.data': EJS_pathtodata + 'cores/parallel_n64-thread-wasm.data?v=' + ASSET_VER,
-                'parallel_n64-wasm.data': EJS_pathtodata + 'cores/parallel_n64-wasm.data?v=' + ASSET_VER,
                 'extract7z.js': EJS_pathtodata + 'compression/extract7z.js?v=' + ASSET_VER,
                 'extractzip.js': EJS_pathtodata + 'compression/extractzip.js?v=' + ASSET_VER
             };
@@ -1222,24 +1157,6 @@
                 threadBadge.textContent = window.EJS_threads ? 'MT' : (SAFE ? 'ST (safe)' : 'ST');
                 threadBadge.className = 'status-badge ' + (window.EJS_threads ? 'ok' : 'warn');
             }
-            // Core profile toggle (Lite / Full): one tap switches cores and
-            // reloads. The choice is remembered, so auto-detected low-end
-            // players can still upgrade to the Full core and vice versa.
-            var coreToggle = document.getElementById('core-toggle');
-            if (coreToggle) {
-                coreToggle.textContent = (EJS_core === 'parallel_n64') ? 'Lite core' : 'Full core';
-                coreToggle.title = (EJS_core === 'parallel_n64')
-                    ? 'Lite: parallel_n64 + Glide64 - faster and smaller (0.9 MB), but its video framing can be imperfect on this engine build. Click to switch to Full (mupen64plus_next) - the page will reload.'
-                    : 'Full: mupen64plus_next + GlideN64 - correct video framing on every device (1.5 MB download). Click to switch to Lite (parallel_n64 - faster on weak hardware, video framing may be imperfect) - the page will reload.';
-                coreToggle.addEventListener('click', function () {
-                    var next = (EJS_core === 'parallel_n64') ? 'full' : 'lite';
-                    try { localStorage.setItem('kantasu_perf_profile', next); } catch (e) {}
-                    var u = new URL(window.location.href);
-                    u.searchParams.set('perf', next);
-                    window.location.href = u.href;
-                });
-            }
-
             // ===== BOOT WATCHDOG + ERROR CAPTURE =====
             // Games should start in well under 45 seconds even on a cold
             // cache (core 1.5MB + ROM up to ~64MB on GitHub Pages CDN). If a
@@ -1803,8 +1720,8 @@
 
                 // ===== AUDIO-STALL DETECTOR ("Tap to start") =====
                 // Browsers refuse to start audio playback without a user
-                // gesture (autoplay policy). The lite core's audio loop then
-                // BLOCKS the entire game ~40 frames after boot - silently,
+                // gesture (autoplay policy). A core's audio loop can then
+                // BLOCK the entire game ~40 frames after boot - silently,
                 // with no error anywhere (verified). Detect it: the game has
                 // "started" but the frame counter is frozen. The overlay
                 // collects the gesture; any click resumes game + audio
@@ -1998,45 +1915,15 @@
             // Disable cheats entirely (prevents memory access out of bounds crash)
             EJS_cheats = [];
 
-            // ===== PERFORMANCE + QUALITY OPTIONS (core-specific) =====
-            // LITE (parallel_n64) and FULL (mupen64plus_next) take entirely
-            // different option sets - every key below was verified against
-            // the exact core binaries this site ships. Shared speed
+            // ===== PERFORMANCE + QUALITY OPTIONS =====
+            // Every key below was verified against the exact core binary
+            // this site ships (mupen64plus_next / GlideN64). Speed
             // principles: cached_interpreter CPU (fastest in WASM - dynarec
             // is impossible in the browser), HLE RSP, native 320x240 in
             // Smooth mode (4x fewer pixels for weak GPUs), original frame
             // pacing. Resolution / HW-lighting follow the Smooth/Sharp
             // quality mode selected above.
-            EJS_defaultOptions = (EJS_core === 'parallel_n64') ? {
-                // ---- LITE: parallel_n64 / Glide64mk2 ----
-                // Glide64: THE lightweight N64 renderer - simple shaders,
-                // few draw calls, full speed on weak / integrated GPUs.
-                'parallel-n64-gfxplugin': 'glide64',
-                'parallel-n64-cpucore': 'cached_interpreter',
-                'parallel-n64-rspplugin': 'hle',
-                // PINNED to native 320x240 on lite: the Glide64 WASM
-                // build can leave its GL viewport at 320x240 while the core
-                // reports a bigger mode (the "whole game in one quarter"
-                // lite symptom), and 640x480 is 4x the pixel load on the
-                // weak devices lite targets. Sharp (2x) only applies to the
-                // Full core, where GlideN64 honors it correctly.
-                'parallel-n64-screensize': '320x240',
-                'parallel-n64-framerate': 'original',
-                // Half the default audio buffer = half the audio latency -
-                // on slow devices the big buffer is what makes sound lag
-                // behind the picture.
-                'parallel-n64-audio-buffer-size': '1024',
-                'parallel-n64-bufferswap': 'enabled',
-                // N64-authentic 3-point filtering (also the cheapest)
-                'parallel-n64-filtering': 'N64 3-point',
-                // webgl2Enabled is REQUIRED for both cores: the engine's
-                // webgl2 decision can come back null (its core-report JSON
-                // parsing is broken in 4.3), and null/falsy makes it request
-                // the '-legacy' WebGL1 filename - which this site does NOT
-                // host. Pinning it guarantees the hosted build is fetched.
-                'webgl2Enabled': 'enabled'
-            } : {
-                // ---- FULL: mupen64plus_next / GlideN64 ----
+            EJS_defaultOptions = {
                 // CPU - fastest available core
                 'mupen64plus-cpucore': 'cached_interpreter',
                 // RSP - HLE (only + fastest option in WASM builds)
