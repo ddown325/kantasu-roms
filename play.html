@@ -331,7 +331,7 @@
             // forward the save/backup system rebuilds progress from scratch
             // and the version only bumps when a true reset is wanted.
             // Each reset costs one clean re-download of the core + ROM.
-            var KANTASU_BOOT_VER = '2026-10-07-lite3';
+            var KANTASU_BOOT_VER = '2026-10-07-lite4';
             var cacheVerOk = false;
             try { cacheVerOk = localStorage.getItem('kantasu_boot_ver') === KANTASU_BOOT_VER; } catch (e) {}
             if (!cacheVerOk) {
@@ -1560,69 +1560,209 @@
             window.EJS_onGameStart = function () {
                 attachSaveListeners();
 
-                // ===== VIDEO CANVAS RESYNC — the "1/4 screen" fix =====
-                // RAWeb sizes the game canvas ONCE, when the GL context is
-                // created. If the core's video mode changes after that
-                // (Sharp 2x mode 640x480, a late video-mode set after the
-                // boot logo, fullscreen enter/exit, or a save-state load),
-                // the GL viewport and the canvas backing store desync.
-                // WebGL's origin is the BOTTOM-LEFT corner, so the scene
-                // then paints into the bottom-left region of a wrongly
-                // sized canvas and shows up as the game zoomed into the
-                // bottom-left quarter of the screen. This watchdog re-syncs
-                // the canvas to the core's real video size, whenever they
-                // disagree, for as long as the session runs.
+                // ===== VIDEO CANVAS RESYNC v2 - the "1/4 screen" fix =====
+                // Two failure modes, one watchdog:
+                //
+                // (1) FULL core (mupen64plus_next): RAWeb sizes the game
+                //     canvas ONCE, when the GL context is created. A later
+                //     video-mode change (Sharp 2x 640x480, a late mode set
+                //     after the boot logo, fullscreen enter/exit, a
+                //     save-state load) desyncs the canvas backing store from
+                //     the core. WebGL's origin is the BOTTOM-LEFT corner, so
+                //     the scene paints into the bottom-left region of the
+                //     wrongly sized canvas = the game zoomed into the
+                //     bottom-left quarter. Fix: resize the canvas to the
+                //     core's reported video size and re-aim the viewport.
+                //
+                // (2) LITE core (parallel_n64 + Glide64): the core can REPORT
+                //     one video size while Glide64 actually PAINTS a smaller
+                //     one. Canvas, core report and every report-based check
+                //     agree, and the complete game renders confined to one
+                //     quarter of the canvas. Fix: read the GL viewport state
+                //     straight back from the GPU (gl.getParameter(VIEWPORT))
+                //     - the ground truth of what is really being painted -
+                //     and when it persistently disagrees with the canvas,
+                //     resize the canvas to the viewport. Trust the paint,
+                //     not the report.
+                //
+                // Plus a pure-layout check (the canvas element drawn far
+                // smaller than its container) for the CSS variant. Every
+                // applied fix logs a '[kantasu]' line; run
+                // __kantasu_video_diag() in the console at any time to
+                // print the exact video geometry.
                 (function () {
                     var directFails = 0;
+                    var lastSig = null, sigCount = 0, vpFixes = 0;
+                    var vpLock = null, graceUntil = 0, lastCAt = 0;
+                    var totalFixes = 0, gaveUp = false;
 
-                    function resyncCanvas(reason) {
+                    function getGl(emu, c) {
                         try {
-                            var emu = window.EJS_emulator;
-                            if (!emu || !emu.started || !emu.canvas || !emu.gameManager) return false;
-                            var vw = 0, vh = 0;
-                            try {
-                                vw = emu.gameManager.getVideoDimensions('width') || 0;
-                                vh = emu.gameManager.getVideoDimensions('height') || 0;
-                            } catch (e) { return false; }
-                            if (vw < 8 || vh < 8) return false;
-                            var c = emu.canvas;
-                            if (c.width === vw && c.height === vh) return false;
-                            // Mismatch detected. Repair path 1: the module's
-                            // own canvas sizing (threaded-build aware).
-                            try {
-                                if (emu.Module && typeof emu.Module.setCanvasSize === 'function') {
-                                    emu.Module.setCanvasSize(vw, vh);
-                                } else {
-                                    c.width = vw; c.height = vh;
-                                }
-                                // Re-aim the GL viewport at the full canvas
-                                // (GL origin is bottom-left - the reason the
-                                // picture sat in the bottom-left corner).
-                                try {
-                                    var gl = (c.GLctxObject && c.GLctxObject.GLctx) ||
-                                             (emu.Module.GL && emu.Module.GL.ctx) || null;
-                                    if (gl) gl.viewport(0, 0, vw, vh);
-                                } catch (e2) {}
-                                if (c.width === vw && c.height === vh) {
-                                    try { emu.handleResize(); } catch (e3) {}
-                                    console.info('[kantasu] video canvas resynced to ' + vw + 'x' + vh + ' (' + reason + ')');
-                                    return true;
-                                }
-                            } catch (e) {}
-                            directFails++;
-                            return false;
-                        } catch (e) { return false; }
+                            return (c.GLctxObject && c.GLctxObject.GLctx) ||
+                                   (emu.Module && emu.Module.GL && emu.Module.GL.ctx) || null;
+                        } catch (e) { return null; }
                     }
 
-                    // Repair path 2 (only if direct sizing keeps failing,
-                    // e.g. an OffscreenCanvas owned by the threaded build):
-                    // a fullscreen round-trip - the emulator's own resize
-                    // path recreates the surface and resets the viewport.
+                    function readState() {
+                        var emu = window.EJS_emulator;
+                        if (!emu || !emu.started || !emu.canvas || !emu.gameManager) return null;
+                        var c = emu.canvas;
+                        var st = { emu: emu, c: c, cw: c.width || 0, ch: c.height || 0,
+                                   coreW: 0, coreH: 0, vpx: -1, vpy: -1, vpw: 0, vph: 0,
+                                   cssW: 0, cssH: 0, boxW: 0, boxH: 0, gl: null };
+                        try {
+                            st.coreW = emu.gameManager.getVideoDimensions('width') || 0;
+                            st.coreH = emu.gameManager.getVideoDimensions('height') || 0;
+                        } catch (e) {}
+                        try {
+                            var gl = getGl(emu, c);
+                            if (gl) {
+                                var vp = gl.getParameter(gl.VIEWPORT);
+                                if (vp && vp.length >= 4) {
+                                    st.vpx = vp[0]; st.vpy = vp[1];
+                                    st.vpw = vp[2]; st.vph = vp[3];
+                                    st.gl = gl;
+                                }
+                            }
+                        } catch (e) {}
+                        try {
+                            st.cssW = c.clientWidth || 0;
+                            st.cssH = c.clientHeight || 0;
+                            var box = c.parentElement;
+                            if (box) { st.boxW = box.clientWidth || 0; st.boxH = box.clientHeight || 0; }
+                        } catch (e) {}
+                        return st;
+                    }
+
+                    function applySize(st, w, h, reason) {
+                        var c = st.c;
+                        try {
+                            if (st.emu.Module && typeof st.emu.Module.setCanvasSize === 'function') {
+                                st.emu.Module.setCanvasSize(w, h);
+                            } else {
+                                c.width = w; c.height = h;
+                            }
+                            try {
+                                var gl = st.gl || getGl(st.emu, c);
+                                if (gl) gl.viewport(0, 0, w, h);
+                            } catch (e2) {}
+                            if (c.width === w && c.height === h) {
+                                try { st.emu.handleResize(); } catch (e3) {}
+                                totalFixes++;
+                                console.info('[kantasu] video canvas resynced to ' + w + 'x' + h + ' (' + reason + ')');
+                                return true;
+                            }
+                        } catch (e) {}
+                        return false;
+                    }
+
+                    // The lite-core signature: the GL viewport persistently
+                    // paints a sub-region of the canvas (or an area larger
+                    // than the canvas) while every reported size agrees.
+                    // Must survive two consecutive polls before acting, so
+                    // transient per-frame viewport changes (aux render
+                    // targets, letterbox passes) never trigger it.
+                    function viewportSignature(st) {
+                        if (!st.gl || st.vpw < 8 || st.vph < 8) return null;
+                        if (st.vpx === 0 && st.vpy === 0) {
+                            if (st.vpw >= 64 && st.vph >= 48 &&
+                                st.vpw <= st.cw * 0.6 && st.vph <= st.ch * 0.6) {
+                                return { kind: 'sub', w: st.vpw, h: st.vph };
+                            }
+                            if (st.vpw >= st.cw * 1.8 && st.vph >= st.ch * 1.8 &&
+                                st.vpw <= 2560 && st.vph <= 1600) {
+                                return { kind: 'grow', w: st.vpw, h: st.vph };
+                            }
+                        }
+                        return null;
+                    }
+
+                    function checkVideo(reason) {
+                        if (gaveUp) return false;
+                        var st = readState();
+                        if (!st || st.cw < 8 || st.ch < 8) return false;
+                        if (totalFixes >= 30) {
+                            gaveUp = true;
+                            console.warn('[kantasu] video: auto-resync cap reached - run __kantasu_video_diag() and report the numbers');
+                            return false;
+                        }
+                        var acted = false;
+
+                        // Path B: trust the paint. The GL viewport persistently
+                        // disagrees with the canvas -> make the canvas match
+                        // what is actually being painted.
+                        var sig = viewportSignature(st);
+                        if (sig && lastSig && sig.kind === lastSig.kind &&
+                            sig.w === lastSig.w && sig.h === lastSig.h) {
+                            sigCount++;
+                        } else {
+                            sigCount = sig ? 1 : 0;
+                            lastSig = sig;
+                        }
+                        if (sig && sigCount >= 2 && vpFixes < 8 &&
+                            (st.cw !== sig.w || st.ch !== sig.h)) {
+                            if (applySize(st, sig.w, sig.h, 'viewport-' + sig.kind + '/' + reason)) {
+                                vpFixes++;
+                                sigCount = 0; lastSig = null;
+                                graceUntil = Date.now() + 2500;
+                                if (vpFixes >= 2) {
+                                    vpLock = { w: sig.w, h: sig.h };
+                                    console.info('[kantasu] video: viewport lock ' + sig.w + 'x' + sig.h +
+                                                 ' (core reports ' + st.coreW + 'x' + st.coreH +
+                                                 ' - report ignored for this session)');
+                                }
+                                acted = true;
+                            }
+                        }
+
+                        // Path A: the canvas disagrees with the core's reported
+                        // video size (the original bottom-left-quarter bug).
+                        // Skipped for a moment after a viewport fix (grace)
+                        // and for the whole session once the paint has proved
+                        // the report wrong twice (lock).
+                        if (!acted) {
+                            if (vpLock) {
+                                if (st.cw !== vpLock.w || st.ch !== vpLock.h) {
+                                    if (applySize(st, vpLock.w, vpLock.h, 'viewport-lock/' + reason)) acted = true;
+                                }
+                            } else if (Date.now() > graceUntil && st.coreW >= 8 && st.coreH >= 8 &&
+                                       (st.cw !== st.coreW || st.ch !== st.coreH)) {
+                                if (!applySize(st, st.coreW, st.coreH, reason)) directFails++;
+                                else acted = true;
+                            }
+                        }
+
+                        // Path C: backing store fine, but the canvas element is
+                        // laid out far smaller than its container (a refit
+                        // that never ran). Pure layout repair - no GL touch.
+                        // A letterboxed fit always fills at least one axis,
+                        // so BOTH axes small means stuck, not letterboxing.
+                        if (!acted && Date.now() - lastCAt > 2000) {
+                            try {
+                                if (st.cssW >= 64 && st.cssH >= 48 &&
+                                    st.boxW >= 200 && st.boxH >= 150 &&
+                                    st.cssW < st.boxW * 0.6 && st.cssH < st.boxH * 0.6) {
+                                    lastCAt = Date.now();
+                                    st.emu.handleResize();
+                                    totalFixes++;
+                                    console.info('[kantasu] video layout refit (' + reason + '): canvas css ' +
+                                                 st.cssW + 'x' + st.cssH + ' in stage ' + st.boxW + 'x' + st.boxH);
+                                    acted = true;
+                                }
+                            } catch (e) {}
+                        }
+                        return acted;
+                    }
+
+                    // Repair path 2 (only if direct sizing keeps failing, e.g.
+                    // an OffscreenCanvas owned by the threaded build): a
+                    // fullscreen round-trip - the emulator's own resize path
+                    // recreates the surface and resets the viewport.
                     function fullscreenResync() {
                         try {
                             var emu = window.EJS_emulator;
                             if (!emu || !emu.started) return;
-                            if (document.fullscreenElement) return; // already FS - leave it
+                            if (document.fullscreenElement) return;
                             emu.toggleFullscreen(true);
                             setTimeout(function () {
                                 try { emu.toggleFullscreen(false); } catch (e) {}
@@ -1630,31 +1770,47 @@
                         } catch (e) {}
                     }
 
-                    // Poll: cheap cwrap string call every 800ms. The first 5
-                    // minutes cover boot logos, menus and late video-mode
-                    // switches; after that keep a slow 3s watch running.
+                    // On-demand diagnostics: prints the exact video geometry.
+                    window.__kantasu_video_diag = function () {
+                        var st = readState();
+                        if (!st) { console.info('[kantasu] video: emulator not running'); return null; }
+                        console.info('[kantasu] video: canvas ' + st.cw + 'x' + st.ch +
+                                     ' | core reports ' + (st.coreW || '?') + 'x' + (st.coreH || '?') +
+                                     ' | gl viewport ' + (st.gl ? st.vpw + 'x' + st.vph : '?') +
+                                     ' | css ' + st.cssW + 'x' + st.cssH +
+                                     ' | stage ' + st.boxW + 'x' + st.boxH +
+                                     ' | lock ' + (vpLock ? vpLock.w + 'x' + vpLock.h : 'none'));
+                        return st;
+                    };
+
+                    // Poll: cheap reads every 800ms (boot logos, menus, late
+                    // video-mode switches), plus a slow 3s watch for the rest
+                    // of the session.
                     setInterval(function () {
-                        if (resyncCanvas('poll')) directFails = 0;
+                        if (checkVideo('poll')) directFails = 0;
                         if (directFails >= 3) { directFails = 0; fullscreenResync(); }
                     }, 800);
-                    setInterval(function () { resyncCanvas('slow-poll'); }, 3000);
+                    setInterval(function () { checkVideo('slow-poll'); }, 3000);
 
                     // Refit on layout events too.
                     window.addEventListener('resize', function () {
-                        setTimeout(function () { resyncCanvas('window-resize'); }, 300);
+                        setTimeout(function () { checkVideo('window-resize'); }, 300);
                     });
                     document.addEventListener('fullscreenchange', function () {
-                        setTimeout(function () { resyncCanvas('fullscreenchange'); }, 600);
+                        setTimeout(function () { checkVideo('fullscreenchange'); }, 600);
                     });
                     document.addEventListener('visibilitychange', function () {
-                        if (!document.hidden) setTimeout(function () { resyncCanvas('visible'); }, 300);
+                        if (!document.hidden) setTimeout(function () { checkVideo('visible'); }, 300);
                     });
 
-                    // Immediate + settled checks around game start.
-                    resyncCanvas('game-start');
-                    setTimeout(function () { resyncCanvas('start+1s'); }, 1000);
-                    setTimeout(function () { resyncCanvas('start+4s'); }, 4000);
-                    setTimeout(function () { resyncCanvas('start+10s'); }, 10000);
+                    // Immediate + settled checks around game start, plus one
+                    // diagnostics snapshot once the video mode settles.
+                    checkVideo('game-start');
+                    setTimeout(function () { checkVideo('start+1s'); }, 1000);
+                    setTimeout(function () { checkVideo('start+3s'); }, 3000);
+                    setTimeout(function () { checkVideo('start+4s'); }, 4000);
+                    setTimeout(function () { checkVideo('start+10s'); }, 10000);
+                    setTimeout(function () { try { window.__kantasu_video_diag(); } catch (e) {} }, 3000);
                 })();
                 // Baseline for the auto-state "is the core actually running"
                 // guard (captureAutoState refuses to snapshot a stalled core,
@@ -1874,8 +2030,13 @@
                 'parallel-n64-gfxplugin': 'glide64',
                 'parallel-n64-cpucore': 'cached_interpreter',
                 'parallel-n64-rspplugin': 'hle',
-                // Native (Smooth) or 2x (Sharp) internal resolution
-                'parallel-n64-screensize': SMOOTH ? '320x240' : '640x480',
+                // PINNED to native 320x240 on lite: the Glide64 WASM
+                // build can leave its GL viewport at 320x240 while the core
+                // reports a bigger mode (the "whole game in one quarter"
+                // lite symptom), and 640x480 is 4x the pixel load on the
+                // weak devices lite targets. Sharp (2x) only applies to the
+                // Full core, where GlideN64 honors it correctly.
+                'parallel-n64-screensize': '320x240',
                 'parallel-n64-framerate': 'original',
                 // Half the default audio buffer = half the audio latency -
                 // on slow devices the big buffer is what makes sound lag
