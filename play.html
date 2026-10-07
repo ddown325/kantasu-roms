@@ -1560,33 +1560,32 @@
             window.EJS_onGameStart = function () {
                 attachSaveListeners();
 
-                // ===== VIDEO CANVAS RESYNC v3 - the "1/4 screen" fix =====
-                // Fixes the canvas-vs-video-mode desync class of bugs:
-                // RAWeb sizes the game canvas ONCE, when the GL context is
-                // created. If the core's video mode changes after that
-                // (Sharp 2x 640x480, a late mode set after the boot logo,
-                // fullscreen enter/exit, a save-state load), the canvas
-                // backing store and the core's real video size desync.
-                // WebGL's origin is the BOTTOM-LEFT corner, so the scene
-                // paints into the bottom-left region of a wrongly sized
-                // canvas and shows up as the game zoomed into the
-                // bottom-left quarter of the screen. This watchdog resyncs
-                // the canvas to the core's reported video size whenever
-                // they disagree, for as long as the session runs.
-                //
-                // Why the GL viewport is read but NEVER resized: N64 games
-                // legitimately render with viewports smaller than the
-                // canvas (letterboxed gameplay, HUD passes, movies) for
-                // seconds at a time on BOTH cores. A v2 experiment that
-                // resized the canvas to the sampled viewport misread that
-                // healthy state as a bug and cropped real games ("zoomed
-                // in, cannot see the full screen"). The viewport is now
-                // diagnostic only - it appears in the
-                // __kantasu_video_diag() console line so any wrong-looking
-                // canvas can be diagnosed from one line.
+                // ===== VIDEO SURFACE LOCK v4 - the "zoomed in / 1/4 screen" fix =====
+                // How the video pipeline ACTUALLY works (verified against
+                // the shipped core glue of BOTH cores + live GL call
+                // traces): the presentation layer inside the core (RAWeb)
+                // watches the game canvas with a ResizeObserver, reports
+                // CSS-size x devicePixelRatio to the wasm
+                // (_platform_emscripten_update_canvas_dimensions_cb), and
+                // letterboxes the core's video into THAT surface through
+                // the GL viewport (measured live: viewport(291,0,681x511)
+                // for a 1264x511 surface, a perfect 4:3 letterbox). The
+                // backing-store size is never used for that math.
+                // THE BUG: whenever the backing store disagrees with the
+                // CSS surface, the letterbox lands clipped and offset and
+                // the game shows as a zoomed-in crop - the classic "1/4
+                // screen / bottom-left" (backing stuck smaller than the
+                // CSS box) and the v1-v3 "zoomed in, cannot see the full
+                // screen" (the watchdog itself shrinking the canvas to
+                // the core's REPORTED video size - that report is the
+                // emulation resolution, NOT the display surface).
+                // THE FIX: lock the backing store to the CSS box x dpr.
+                // Never size the canvas from the core report, and never
+                // touch the GL viewport - RAWeb owns it, every frame.
                 (function () {
                     var directFails = 0;
                     var lastCAt = 0, totalFixes = 0, gaveUp = false;
+                    var lastApplied = '';
 
                     function getGl(emu, c) {
                         try {
@@ -1625,25 +1624,28 @@
                         return st;
                     }
 
+                    // Direct backing-store assignment ONLY. Deliberately
+                    // NOT Module.setCanvasSize (it fires the core's resize
+                    // listener and emscripten's canvas strategy, starting
+                    // a fight with RAWeb's own surface math) and
+                    // deliberately no gl.viewport()/handleResize() - RAWeb
+                    // re-aims the viewport itself every frame and the CSS
+                    // layer is already correct. A direct assignment fires
+                    // no callbacks (ResizeObserver only watches the CSS
+                    // box), so this can never loop with the engine.
                     function applySize(st, w, h, reason) {
                         var c = st.c;
                         try {
-                            if (st.emu.Module && typeof st.emu.Module.setCanvasSize === 'function') {
-                                st.emu.Module.setCanvasSize(w, h);
-                            } else {
-                                c.width = w; c.height = h;
-                            }
-                            // Re-aim the GL viewport at the full canvas
-                            // (GL origin is bottom-left - the reason the
-                            // picture sat in the bottom-left corner).
-                            try {
-                                var gl = st.gl || getGl(st.emu, c);
-                                if (gl) gl.viewport(0, 0, w, h);
-                            } catch (e2) {}
+                            c.width = w; c.height = h;
                             if (c.width === w && c.height === h) {
-                                try { st.emu.handleResize(); } catch (e3) {}
                                 totalFixes++;
-                                console.info('[kantasu] video canvas resynced to ' + w + 'x' + h + ' (' + reason + ')');
+                                var key = w + 'x' + h;
+                                if (lastApplied !== key) {
+                                    lastApplied = key;
+                                    console.info('[kantasu] video surface locked to ' + w + 'x' + h + ' (' + reason +
+                                                 '; css ' + st.cssW + 'x' + st.cssH + ' @' +
+                                                 (window.devicePixelRatio || 1) + 'x)');
+                                }
                                 return true;
                             }
                         } catch (e) {}
@@ -1654,20 +1656,29 @@
                         if (gaveUp) return false;
                         var st = readState();
                         if (!st || st.cw < 8 || st.ch < 8) return false;
-                        if (totalFixes >= 30) {
+                        if (totalFixes >= 120) {
                             gaveUp = true;
-                            console.warn('[kantasu] video: auto-resync cap reached - run __kantasu_video_diag() and report the numbers');
+                            console.warn('[kantasu] video: surface-lock cap reached - run __kantasu_video_diag() and report the numbers');
                             return false;
                         }
                         var acted = false;
 
-                        // Path A: the canvas backing store disagrees with the
-                        // core's reported video size (the bottom-left-quarter
-                        // zoom). Resize the canvas to the reported size.
-                        if (st.coreW >= 8 && st.coreH >= 8 &&
-                            (st.cw !== st.coreW || st.ch !== st.coreH)) {
-                            if (applySize(st, st.coreW, st.coreH, reason)) acted = true;
-                            else directFails++;
+                        // Path A (v4 surface lock): the backing store must
+                        // equal the CSS box x devicePixelRatio - the exact
+                        // surface RAWeb letterboxes into. Anything else
+                        // (a canvas stuck at the 300x150 init default, the
+                        // v1-v3 shrink-to-core-report, a stale fullscreen
+                        // size) renders the game zoomed-in / cropped. The
+                        // core's reported video size is the emulation
+                        // resolution only - deliberately ignored here.
+                        if (st.cssW >= 64 && st.cssH >= 48) {
+                            var dpr = window.devicePixelRatio || 1;
+                            var expW = Math.round(st.cssW * dpr);
+                            var expH = Math.round(st.cssH * dpr);
+                            if (st.cw !== expW || st.ch !== expH) {
+                                if (applySize(st, expW, expH, reason)) acted = true;
+                                else directFails++;
+                            }
                         }
 
                         // Path C: backing store fine, but the canvas element
@@ -1692,10 +1703,10 @@
                         return acted;
                     }
 
-                    // Repair path 2 (only if direct sizing keeps failing,
-                    // e.g. an OffscreenCanvas owned by the threaded build):
-                    // a fullscreen round-trip - the emulator's own resize
-                    // path recreates the surface and resets the viewport.
+                    // Repair path 2 (only if direct assignment keeps
+                    // failing, e.g. an OffscreenCanvas owned by the
+                    // threaded build): a fullscreen round-trip - the
+                    // emulator's own resize path recreates the surface.
                     function fullscreenResync() {
                         try {
                             var emu = window.EJS_emulator;
@@ -1709,20 +1720,30 @@
                     }
 
                     // On-demand diagnostics: prints the exact video geometry.
+                    // "surface locked" = backing store matches the CSS box
+                    // x dpr (the v4 invariant). Anything else is a bug: run
+                    // this and check which number is off.
                     window.__kantasu_video_diag = function () {
                         var st = readState();
                         if (!st) { console.info('[kantasu] video: emulator not running'); return null; }
+                        var dpr = window.devicePixelRatio || 1;
+                        var expW = Math.round((st.cssW || 0) * dpr);
+                        var expH = Math.round((st.cssH || 0) * dpr);
+                        var sync = (st.cw === expW && st.ch === expH);
                         console.info('[kantasu] video: canvas ' + st.cw + 'x' + st.ch +
+                                     (sync ? ' (surface locked)' : ' (MISMATCH - expected ' + expW + 'x' + expH + ')') +
                                      ' | core reports ' + (st.coreW || '?') + 'x' + (st.coreH || '?') +
                                      ' | gl viewport ' + (st.gl ? st.vpw + 'x' + st.vph : '?') +
-                                     ' | css ' + st.cssW + 'x' + st.cssH +
+                                     ' | css ' + st.cssW + 'x' + st.cssH + ' @' + dpr + 'x' +
                                      ' | stage ' + st.boxW + 'x' + st.boxH);
                         return st;
                     };
 
-                    // Poll: cheap cwrap call every 800ms. The first 5
-                    // minutes cover boot logos, menus and late video-mode
-                    // switches; after that keep a slow 3s watch running.
+                    // Poll: two cheap geometry reads every 800ms (the
+                    // backing/CSS comparison is pure DOM math - no engine
+                    // calls). Covers boot, window resizes, fullscreen
+                    // enter/exit and anything that re-sizes the canvas;
+                    // after 5 minutes a slow 3s watch keeps running.
                     setInterval(function () {
                         if (checkVideo('poll')) directFails = 0;
                         if (directFails >= 3) { directFails = 0; fullscreenResync(); }
