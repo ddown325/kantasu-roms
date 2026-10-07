@@ -403,10 +403,14 @@
         }
 
         function playGame(game) {
+            // v= cache-busts play.html for every visitor the moment a new
+            // build ships (GitHub Pages serves it with a 10-minute max-age;
+            // a never-seen query string always misses that cache).
+            const v = 'lite4';
             if (game.isUser || game.romBlob) {
-                window.location.href = `play.html?usergame=${encodeURIComponent(game.id)}`;
+                window.location.href = `play.html?v=${v}&usergame=${encodeURIComponent(game.id)}`;
             } else {
-                window.location.href = `play.html?rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}`;
+                window.location.href = `play.html?v=${v}&rom=${encodeURIComponent(game.rom)}&name=${encodeURIComponent(game.title)}`;
             }
         }
 
