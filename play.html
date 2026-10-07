@@ -1085,12 +1085,18 @@
             //          integrated-GPU devices: smaller install, faster core
             //          compile, less memory, less GC pressure. Measured:
             //          ~2x the fps of the full core on a weak GPU.
+            //          v5 CAVEAT: its Glide64 presentation mis-maps video
+            //          by canvas geometry (zoom/quarter-screen class bugs,
+            //          varying per boot) - so it is OPT-IN ONLY since v5,
+            //          never the automatic default.
             //   FULL = mupen64plus_next + GlideN64. Bigger (1.5 MB core
             //          download, 6.6 MB wasm) and more accurate on edge
             //          cases; the default on capable hardware.
             // Selection order: ?perf= URL param, then the player's saved
-            // choice (nav toggle), then auto-detection (mobile UA, <= 4 CPU
-            // threads, or <= 4 GB RAM => lite).
+            // choice (nav toggle). v5: everyone else defaults to FULL - the
+            // lite core's video presentation is unreliable on this engine
+            // build, so low-end auto-detection only logs, it no longer
+            // picks lite (see the v5 note in the profile block below).
             var LOW_END = false, LOW_END_WHY = [];
             try {
                 var ua = navigator.userAgent || '';
@@ -1100,10 +1106,30 @@
             } catch (e) {}
             var perfParam = null, savedProfile = null;
             try { perfParam = params.get('perf'); } catch (e) {}
+            // v5: the lite core's Glide64 presentation mis-maps the video
+            // depending on the canvas geometry sampled at core init -
+            // zoomed crops, offsets, or quarter-screen frames that vary
+            // per boot (reproduced and confirmed on the live site). The
+            // full core renders correctly at any canvas size (verified
+            // against the authentic title-screen geometry). So FULL is
+            // now the default for EVERYONE, low-end included: a correct
+            // picture at a lower frame rate beats a broken one. Lite
+            // remains available as an explicit manual choice (?perf=lite
+            // or the nav core toggle) for players who prefer its speed.
+            // One-time migration: clear stale saved 'lite' pins from the
+            // auto-detect era so nobody stays parked on the broken default.
+            try {
+                if (localStorage.getItem('kantasu_profile_v5') !== '1') {
+                    if (localStorage.getItem('kantasu_perf_profile') === 'lite') {
+                        localStorage.removeItem('kantasu_perf_profile');
+                    }
+                    localStorage.setItem('kantasu_profile_v5', '1');
+                }
+            } catch (e) {}
             try { savedProfile = localStorage.getItem('kantasu_perf_profile'); } catch (e) {}
             var PROFILE = (perfParam === 'lite' || perfParam === 'full') ? perfParam
                         : (savedProfile === 'lite' || savedProfile === 'full') ? savedProfile
-                        : (LOW_END ? 'lite' : 'full');
+                        : 'full';
             try { localStorage.setItem('kantasu_perf_profile', PROFILE); } catch (e) {}
             EJS_core = (PROFILE === 'lite') ? 'parallel_n64' : 'mupen64plus_next';
             // ?core=parallel_n64 / ?core=mupen64plus_next remains the raw
@@ -1119,7 +1145,7 @@
             // mismatched states are dropped instead of loaded.
             var STATE_CORE_TAG = '43:' + (EJS_core === 'parallel_n64' ? 'p64' : 'm64n');
             if (LOW_END_WHY.length) {
-                try { console.info('[kantasu] low-end device detected (' + LOW_END_WHY.join(', ') + ') - using the lite core'); } catch (e) {}
+                try { console.info('[kantasu] low-end device detected (' + LOW_END_WHY.join(', ') + ') - staying on the full core for correct video (v5); the lite core is available via the core toggle'); } catch (e) {}
             }
             EJS_gameUrl = romUrl;
             EJS_gameName = gameName;
@@ -1203,8 +1229,8 @@
             if (coreToggle) {
                 coreToggle.textContent = (EJS_core === 'parallel_n64') ? 'Lite core' : 'Full core';
                 coreToggle.title = (EJS_core === 'parallel_n64')
-                    ? 'Lite: parallel_n64 + Glide64 - half-size core built for low-end devices (0.9 MB download). Click to switch to Full (mupen64plus_next) - the page will reload.'
-                    : 'Full: mupen64plus_next + GlideN64 - the accuracy core (1.5 MB download). Click to switch to Lite (parallel_n64 - half the size, lighter on weak hardware) - the page will reload.';
+                    ? 'Lite: parallel_n64 + Glide64 - faster and smaller (0.9 MB), but its video framing can be imperfect on this engine build. Click to switch to Full (mupen64plus_next) - the page will reload.'
+                    : 'Full: mupen64plus_next + GlideN64 - correct video framing on every device (1.5 MB download). Click to switch to Lite (parallel_n64 - faster on weak hardware, video framing may be imperfect) - the page will reload.';
                 coreToggle.addEventListener('click', function () {
                     var next = (EJS_core === 'parallel_n64') ? 'full' : 'lite';
                     try { localStorage.setItem('kantasu_perf_profile', next); } catch (e) {}
