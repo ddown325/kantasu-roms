@@ -406,7 +406,7 @@
             // v= cache-busts play.html for every visitor the moment a new
             // build ships (GitHub Pages serves it with a 10-minute max-age;
             // a never-seen query string always misses that cache).
-            const v = 'lite7';
+            const v = 'full1';
             if (game.isUser || game.romBlob) {
                 window.location.href = `play.html?v=${v}&usergame=${encodeURIComponent(game.id)}`;
             } else {
