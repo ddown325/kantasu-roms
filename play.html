@@ -509,6 +509,27 @@
                 if (romUrl && !romUrl.match(/^https?:\/\//)) {
                     romUrl = new URL(romUrl, window.location.href).href;
                 }
+                // v8 FIX (ROM cache-busting): a '?v=' query on a repo ROM URL
+                // busts the HTTP + EJS IndexedDB caches when a zip's bytes
+                // change on the server, but the engine's extension sniffing
+                // sees "name.zip?v=fix64", fails to detect the archive and
+                // feeds raw compressed bytes to the core ("memory access out
+                // of bounds"). Fetch such URLs here and hand the engine a
+                // File whose NAME is the clean basename - the File path it
+                // signature-detects and extracts correctly (same path as
+                // uploaded ROMs since v7).
+                if (typeof romUrl === 'string' && romUrl.indexOf('?') !== -1) {
+                    try {
+                        var cleanRomName = decodeURIComponent(romUrl.split('?')[0].split('/').pop() || 'rom.zip');
+                        var romResp = await fetch(romUrl);
+                        if (!romResp.ok) throw new Error('HTTP ' + romResp.status);
+                        var romBlob = await romResp.blob();
+                        romUrl = new File([romBlob], cleanRomName, { type: 'application/zip' });
+                    } catch (e) {
+                        // fetch failed (offline / bad URL): fall back to the
+                        // raw URL so the engine shows its own error state.
+                    }
+                }
             }
 
             document.getElementById('game-name').textContent = gameName;
