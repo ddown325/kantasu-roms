@@ -1166,9 +1166,50 @@
             // and the CDN-failsafe URLs bypass it - verified in engine
             // source). Verified working flow: cores + extractors only.
             var ASSET_VER = encodeURIComponent(KANTASU_BOOT_VER);
+            // ===== BIG-ROM CORE ROUTING (v9) =====
+            // The stock mupen64plus_next core hard-caps the cartridge ROM at
+            // 64 MiB (CART_ROM_MAX_SIZE): M64CMD_ROM_OPEN rejects anything
+            // bigger, the boot falls back to the frontend menu, and the cheat
+            // system then crashes with "memory access out of bounds" (the
+            // cheat list is only initialized after a successful ROM open).
+            // The three library games with original files bigger than 64 MiB
+            // (Dream 64 223.5 MiB, B3313 Original 96 MiB, SM64 The Nostalgia
+            // Trip 159.5 MiB) plus any uploaded ROM over 64 MiB are routed to
+            // a patched build of the SAME core version that accepts ROMs up
+            // to 256 MiB and addresses the full cartridge range (the N64 dom1
+            // cart space). Save states stay core-tag-compatible; regular
+            // games keep the byte-identical stock core. Detected on the clean
+            // rom path (query stripped) or on the uploaded File's size.
+            var BIGROM_CORE_VER = 'ogcore1';
+            // romUrl is a plain string for repo ROM URLs without a query,
+            // a File (name = clean rom basename) for query-carrying repo
+            // URLs (fetched page-side below) and for uploaded ROMs, or a
+            // File wrapping the stored blob for legacy upload records.
+            var romPathClean = (typeof romUrl === 'string')
+                ? romUrl.split('?')[0]
+                : ((romUrl && typeof romUrl.name === 'string') ? romUrl.name : '');
+            var romLower = romPathClean.toLowerCase();
+            var isBigRom = false;
+            if (romLower.indexOf('dream 64') !== -1 ||
+                romLower.indexOf('b3313') !== -1 ||
+                romLower.indexOf('nostalgia trip') !== -1) {
+                isBigRom = true;
+            }
+            try {
+                if (!isBigRom && typeof Blob !== 'undefined' &&
+                    romUrl instanceof Blob && romUrl.size > 67108864) {
+                    isBigRom = true;
+                }
+            } catch (e) {}
+            var coreMtUrl = isBigRom
+                ? EJS_pathtodata + 'cores/mupen64plus_next-bigrom-thread-wasm.data?v=' + BIGROM_CORE_VER
+                : EJS_pathtodata + 'cores/mupen64plus_next-thread-wasm.data?v=' + ASSET_VER;
+            var coreStUrl = isBigRom
+                ? EJS_pathtodata + 'cores/mupen64plus_next-bigrom-wasm.data?v=' + BIGROM_CORE_VER
+                : EJS_pathtodata + 'cores/mupen64plus_next-wasm.data?v=' + ASSET_VER;
             window.EJS_paths = {
-                'mupen64plus_next-thread-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-thread-wasm.data?v=' + ASSET_VER,
-                'mupen64plus_next-wasm.data': EJS_pathtodata + 'cores/mupen64plus_next-wasm.data?v=' + ASSET_VER,
+                'mupen64plus_next-thread-wasm.data': coreMtUrl,
+                'mupen64plus_next-wasm.data': coreStUrl,
                 'extract7z.js': EJS_pathtodata + 'compression/extract7z.js?v=' + ASSET_VER,
                 'extractzip.js': EJS_pathtodata + 'compression/extractzip.js?v=' + ASSET_VER
             };
