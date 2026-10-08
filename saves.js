@@ -85,8 +85,9 @@
         if (userGame) return 'user:' + userGame;
         const rom = params.get('rom') || '';
         if (!rom) return null;
-        // basename of the rom path, extension stripped
-        const base = rom.split(/[\\/]/).pop() || rom;
+        // basename of the rom path, query string and extension stripped
+        // (rom URLs may carry a ?v= cache-bust that must not leak into the key)
+        const base = (rom.split(/[\\/]/).pop() || rom).split('?')[0];
         return 'rom:' + base.replace(/\.(zip|z64|n64|v64)$/i, '');
     }
 
