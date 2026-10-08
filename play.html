@@ -179,6 +179,7 @@
             var params = new URLSearchParams(window.location.search);
             var romUrl = '';
             var gameName = '';
+            var gameCategory = null; // set for user games (their saved category)
             var userGameId = params.get('usergame');
 
             // ===== RELOAD GATE (prevents permanent IndexedDB lockups) =====
@@ -317,10 +318,11 @@
             // debug keys accumulated across builds. Requested fix: on every
             // stack version change, FACTORY-RESET this origin's entire
             // browser storage - not just the cache DBs:
-            //   - EVERY IndexedDB on the origin (enumerated live, so nothing
-            //     old can hide: EmulatorJS-Cache/-core/-roms/-bios/-states,
-            //     /data/saves, kantasu_saves_db, kantasu_roms_db, anything
-            //     else a past build ever created)
+            //   - every RE-DOWNLOADABLE IndexedDB on the origin (enumerated
+            //     live: EmulatorJS-Cache/-core/-roms/-bios/-states,
+            //     /data/saves, anything else a past build created).
+            //     USER DATA IS EXCLUDED since v7: kantasu_roms_db (uploaded
+            //     ROMs) and kantasu_saves_db (save backups) survive.
             //   - CacheStorage (window.caches)
             //   - ALL service workers (the coi COOP/COEP worker re-registers
             //     itself automatically on the next load)
@@ -346,11 +348,21 @@
                         }
                     }
                 } catch (e) {}
+                // v7: kantasu_roms_db (uploaded ROMs) and kantasu_saves_db
+                // (the save-backup layer) are USER DATA and are NEVER wiped
+                // by this reset. Deleting them here was the "uploaded roms
+                // don't work" bug: the factory reset destroyed the upload
+                // database before the game could load it, then play.html
+                // threw "Game not found in storage!". The re-downloadable
+                // emulator caches (EmulatorJS-*, the emscripten FS) are
+                // still wiped; saves restore from their backup layer and
+                // uploads survive every version bump.
+                var PRESERVE_DBS = ['kantasu_roms_db', 'kantasu_saves_db'];
                 [
                     'EmulatorJS-Cache', 'EmulatorJS-core', 'EmulatorJS-roms',
-                    'EmulatorJS-bios', 'EmulatorJS-states', '/data/saves',
-                    'kantasu_saves_db', 'kantasu_roms_db'
+                    'EmulatorJS-bios', 'EmulatorJS-states', '/data/saves'
                 ].forEach(function (n) { if (dbNames.indexOf(n) === -1) dbNames.push(n); });
+                dbNames = dbNames.filter(function (n) { return PRESERVE_DBS.indexOf(n) === -1; });
                 var wipeResults = [];
                 try {
                     wipeResults = await Promise.all(dbNames.map(function (n) { return forceDeleteDb(n, 5000); }));
@@ -458,8 +470,28 @@
                     await openDB();
                     var gameRecord = await dbGet(userGameId);
                     if (gameRecord && gameRecord.romBlob) {
-                        romUrl = URL.createObjectURL(gameRecord.romBlob);
+                        // v7 FIX (uploaded ROMs crashed the core with
+                        // "memory access out of bounds"): a blob: URL goes
+                        // down the engine's handleNonHttpUrl path, which
+                        // writes the raw bytes to the core's filesystem
+                        // under the blob UUID - NO extraction, no
+                        // extension - so a zipped ROM was parsed as a raw
+                        // N64 image and the core died at boot (every time;
+                        // the crash self-heal looped). The engine's
+                        // File-object path (download() -> "e instanceof
+                        // File") signature-detects the compression, extracts
+                        // the archive and names the file correctly, so hand
+                        // it the stored File itself. Legacy records that
+                        // lost the File class are re-wrapped with their
+                        // original name.
+                        var rb = gameRecord.romBlob;
+                        var romName = gameRecord.romName ||
+                            (typeof rb.name === 'string' && rb.name) ||
+                            (gameRecord.title || 'game').replace(/[^\w.-]+/g, '_');
+                        romUrl = (rb instanceof File) ? rb
+                            : new File([rb], romName, { type: rb.type || 'application/octet-stream' });
                         gameName = gameRecord.title || 'Game';
+                        gameCategory = gameRecord.category || null;
                     } else {
                         alert('Game not found in storage!');
                         window.location.href = 'index.html';
@@ -644,7 +676,8 @@
             var SAVE_KEY = (window.KantasuSaves && params) ? KantasuSaves.gameKeyFromParams(params) : null;
             var SAVE_META = {
                 gameName: gameName,
-                category: (romUrl && romUrl.indexOf('og-roms') !== -1) ? 'og-roms' : 'rom-hacks'
+                category: gameCategory ||
+                    ((typeof romUrl === 'string' && romUrl.indexOf('og-roms') !== -1) ? 'og-roms' : 'rom-hacks')
             };
             var saveLastBuffer = null;   // ArrayBuffer of the last mirrored SRAM
             var saveLastTime = 0;
@@ -766,6 +799,7 @@
             var autoStateTimer = null;
             var autoStateBusy = false;     // a capture is being written
             var autoStateResumed = false;  // we already resumed this session
+            var autoStateLastFrame = null; // v7 perf: skip no-progress snaps
 
             function captureAutoState(source) {
                 if (!SAVE_KEY || !window.KantasuSaves || autoStateBusy) return;
@@ -787,6 +821,10 @@
                             window.__kantasu_boot_frame = f;
                             return; // baseline just set - not live yet
                         }
+                        // v7 perf: no frame progress since the last snapshot
+                        // means an identical state - skip the serialization.
+                        if (autoStateLastFrame !== null && f <= autoStateLastFrame) return;
+                        autoStateLastFrame = f;
                     } catch (ef) {}
                     // getState() is synchronous and returns a COPY of the
                     // state bytes (safe against HEAP moves afterwards).
@@ -1840,7 +1878,11 @@
                 if (saveAutoTimer) clearInterval(saveAutoTimer);
                 saveAutoTimer = setInterval(function () {
                     try {
-                        if (window.EJS_emulator && EJS_emulator.started) saveNow();
+                        // v7 perf: skip the 20s save flush while the tab is
+                        // hidden - nothing visible progresses and the core
+                        // flush competes with background audio playback.
+                        if (document.visibilityState === 'visible' &&
+                            window.EJS_emulator && EJS_emulator.started) saveNow();
                     } catch (e) {}
                 }, 20000);
 
@@ -1850,9 +1892,21 @@
                 // resume. (N64 states are a few MB; getState() is a fast
                 // synchronous copy.)
                 if (autoStateTimer) clearInterval(autoStateTimer);
+                // v7 perf: the 30s auto-state capture serializes the whole
+                // N64 heap (a multi-MB synchronous copy) - a visible hitch
+                // on weak devices. Run it only when the tab is visible, at
+                // idle time (between rendered frames), and only when the
+                // game actually progressed since the last snapshot.
                 autoStateTimer = setInterval(function () {
                     try {
-                        captureAutoState('interval');
+                        if (document.visibilityState !== 'visible') return;
+                        if (!window.EJS_emulator || !window.EJS_emulator.started) return;
+                        var runCapture = function () { captureAutoState('interval'); };
+                        if (window.requestIdleCallback) {
+                            window.requestIdleCallback(runCapture, { timeout: 2500 });
+                        } else {
+                            setTimeout(runCapture, 0);
+                        }
                     } catch (e) {}
                 }, 30000);
             };
